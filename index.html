@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rifa de los 100 números</title>
+<style>
+  :root {
+    --page: #E8EEEF;
+    --text: #14213D;
+    --muted: #4F5D75;
+    --panel: #FFFFFF;
+    --line: #C9D4D8;
+    --felt: #0F4C45;
+    --felt-dark: #0A3631;
+    --ticket: #F6F1E4;
+    --gold: #F2B134;
+    --coral: #E8506A;
+    --ink: #14213D;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0C1A1F;
+      --text: #EAF1F2;
+      --muted: #9FB3BA;
+      --panel: #13262D;
+      --line: #25404A;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text);
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 20px 14px 64px; }
+  h1, h2, .display {
+    font-family: "Arial Rounded MT Bold", "Nunito", "Trebuchet MS", system-ui, sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  h1 { font-size: clamp(1.7rem, 6vw, 2.5rem); line-height: 1.1; }
+  h2 { font-size: 1.15rem; }
+  p { margin: 0; }
+  button { font: inherit; cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
+  .hidden { display: none !important; }
+
+  .setup {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 22px;
+    display: grid;
+    gap: 14px;
+    margin-top: 16px;
+  }
+  label { display: grid; gap: 6px; font-weight: 700; font-size: .95rem; }
+  label small { font-weight: 400; color: var(--muted); }
+  input[type=text], input[type=number] {
+    font: inherit;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 2px solid var(--line);
+    background: var(--page);
+    color: var(--text);
+    width: 100%;
+  }
+  input:focus { border-color: var(--felt); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 55%, transparent); }
+  .btn {
+    border: 0;
+    border-radius: 12px;
+    padding: 13px 20px;
+    font-weight: 800;
+    background: var(--gold);
+    color: var(--ink);
+    min-height: 46px;
+  }
+  .btn:hover { filter: brightness(1.05); }
+  .btn.ghost { background: transparent; color: var(--text); border: 2px solid var(--line); }
+  .btn.danger { background: var(--coral); color: #fff; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  .top { display: grid; gap: 8px; }
+  .prize { color: var(--muted); font-size: 1rem; }
+  .prize b { color: var(--text); }
+  .share-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+  .share-row .btn { min-height: 40px; padding: 8px 16px; }
+  .org-tag { font-size: .9rem; color: var(--muted); }
+
+  .stage {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 16px;
+    align-items: center;
+    background: var(--felt);
+    color: #fff;
+    border-radius: 18px;
+    padding: 16px;
+    margin-top: 14px;
+  }
+  @media (max-width: 460px) { .stage { grid-template-columns: 110px 1fr; } }
+
+  .envelope { position: relative; width: 100%; aspect-ratio: 4 / 3; perspective: 600px; }
+  .env-body {
+    position: absolute; inset: 0;
+    background: var(--ticket);
+    border-radius: 8px;
+    box-shadow: 0 6px 14px rgba(0,0,0,.35);
+    overflow: hidden;
+  }
+  .env-body::before, .env-body::after {
+    content: ""; position: absolute; bottom: 0; width: 55%; height: 62%;
+    background: #E7DFC9;
+  }
+  .env-body::before { left: 0; clip-path: polygon(0 0, 100% 100%, 0 100%); }
+  .env-body::after { right: 0; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+  .letter {
+    position: absolute; left: 12%; right: 12%; top: 14%; bottom: 14%;
+    background: #fff; color: var(--ink);
+    border-radius: 6px;
+    display: grid; place-items: center;
+    transition: transform .8s cubic-bezier(.2,.8,.2,1) .35s;
+    z-index: 1;
+  }
+  .letter span { font-family: "Arial Rounded MT Bold", system-ui, sans-serif; font-weight: 900; font-size: clamp(2rem, 9vw, 3rem); }
+  .flap {
+    position: absolute; left: 0; right: 0; top: 0; height: 58%;
+    background: #D8CFB4;
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    transform-origin: top;
+    transition: transform .6s ease;
+    z-index: 3;
+  }
+  .seal {
+    position: absolute; left: 50%; top: 52%;
+    width: 30%; aspect-ratio: 1; border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--coral);
+    color: #fff; font-weight: 900;
+    display: grid; place-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4);
+    z-index: 4;
+    transition: opacity .3s;
+    font-family: "Arial Rounded MT Bold", system-ui, sans-serif;
+  }
+  .envelope.open .flap { transform: rotateX(180deg); z-index: 0; }
+  .envelope.open .seal { opacity: 0; }
+  .envelope.open .letter { transform: translateY(-34%); z-index: 2; }
+  .envelope.ready .seal { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: translate(-50%, -50%) scale(1.14); } }
+
+  .progress-info { display: grid; gap: 10px; }
+  .count { font-size: 1.9rem; }
+  .count small { font-size: 1rem; font-weight: 400; opacity: .8; }
+  .bar { height: 12px; border-radius: 99px; background: var(--felt-dark); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .3s; }
+  .stage .btn { justify-self: start; }
+  .status-line { font-size: .95rem; opacity: .92; }
+
+  .board {
+    margin-top: 16px;
+    background: var(--felt);
+    border-radius: 18px;
+    padding: 12px;
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: clamp(3px, 1.2vw, 8px);
+  }
+  .cell {
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 0;
+    background: var(--ticket);
+    color: var(--ink);
+    font-family: "Arial Rounded MT Bold", system-ui, sans-serif;
+    font-weight: 800;
+    font-size: clamp(.62rem, 2.6vw, 1.05rem);
+    display: grid; place-content: center; text-align: center;
+    line-height: 1.05;
+    padding: 0;
+    min-width: 0;
+    transition: transform .12s, background .2s;
+  }
+  .cell:hover { transform: scale(1.08); }
+  .cell em {
+    font-style: normal; font-weight: 700;
+    font-size: clamp(.4rem, 1.7vw, .62rem);
+    opacity: .85;
+    overflow: hidden; max-width: 100%;
+  }
+  .cell.taken { background: var(--gold); }
+  .cell.winner { background: var(--coral); color: #fff; animation: winner 1s ease-in-out infinite; z-index: 1; }
+  .cell.lost { opacity: .45; }
+  @keyframes winner { 50% { transform: scale(1.22); box-shadow: 0 0 0 5px rgba(255,255,255,.5); } }
+
+  .banner {
+    margin-top: 16px;
+    background: var(--coral);
+    color: #fff;
+    border-radius: 18px;
+    padding: 20px;
+    display: grid; gap: 6px;
+  }
+  .banner .big { font-size: clamp(1.5rem, 6vw, 2.2rem); }
+  .banner .proof { font-size: .85rem; opacity: .92; }
+  .banner .btn { justify-self: start; margin-top: 8px; background: #fff; color: var(--ink); }
+
+  .people { margin-top: 22px; display: grid; gap: 8px; }
+  .person {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
+  }
+  .person b { white-space: nowrap; }
+  .person span { color: var(--muted); font-size: .9rem; text-align: right; overflow-wrap: anywhere; }
+  .empty { color: var(--muted); }
+  .footer-actions { margin-top: 22px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .panel-msg {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 22px;
+    display: grid; gap: 12px;
+    margin-top: 16px;
+  }
+  .panel-msg code { background: var(--page); padding: 2px 6px; border-radius: 6px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 18px;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color: #fff;
+    padding: 12px 18px; border-radius: 12px;
+    max-width: 92vw; text-align: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s, transform .25s;
+    z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  dialog {
+    border: 0; border-radius: 18px;
+    padding: 22px;
+    width: min(92vw, 380px);
+    background: var(--panel); color: var(--text);
+  }
+  dialog::backdrop { background: rgba(5, 15, 18, .65); }
+  dialog form { display: grid; gap: 14px; }
+  .dlg-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .dlg-num { font-size: 2.4rem; color: var(--felt); }
+  @media (prefers-color-scheme: dark) { .dlg-num { color: var(--gold); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Mensajes de estado (config, errores, rifa no encontrada) -->
+  <section id="msg" class="panel-msg hidden"></section>
+
+  <!-- Crear rifa -->
+  <section id="setup" class="setup hidden">
+    <h1>Rifa de los 100 números</h1>
+    <p class="prize">Se guarda un número secreto en un sobre sellado. Cada persona elige su número desde su celular y, cuando se vendan los 100, el organizador abre el sobre: gana quien tenga ese número.</p>
+    <label>Nombre de la rifa
+      <input type="text" id="inTitle" value="Gran rifa" maxlength="40">
+    </label>
+    <label>Premio
+      <input type="text" id="inPrize" placeholder="Ej.: Canasta navideña" maxlength="60">
+    </label>
+    <label>Valor por número <small>Opcional, sirve para llevar la cuenta de lo recaudado.</small>
+      <input type="number" id="inPrice" min="0" step="any" placeholder="Ej.: 5">
+    </label>
+    <button class="btn" id="btnStart">Sellar el sobre y crear la rifa</button>
+  </section>
+
+  <!-- Juego -->
+  <section id="game" class="hidden">
+    <div class="top">
+      <h1 id="gTitle"></h1>
+      <p class="prize" id="gPrize"></p>
+      <div class="share-row">
+        <button class="btn" id="btnShare">Compartir enlace</button>
+        <span class="org-tag hidden" id="orgTag">Eres el organizador de esta rifa.</span>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="envelope" id="env" aria-label="Sobre con el número secreto">
+        <div class="env-body">
+          <div class="letter"><span id="secretNum">?</span></div>
+        </div>
+        <div class="flap"></div>
+        <div class="seal">?</div>
+      </div>
+      <div class="progress-info">
+        <div class="count display"><span id="cTaken">0</span> <small>de 100 vendidos</small></div>
+        <div class="bar"><i id="bar"></i></div>
+        <p class="status-line" id="statusLine"></p>
+        <button class="btn hidden" id="btnOpen">Abrir el sobre</button>
+      </div>
+    </div>
+
+    <div id="winnerBanner" class="banner hidden" role="status"></div>
+
+    <div class="board" id="board" role="group" aria-label="Tablero de números"></div>
+
+    <div class="people">
+      <h2>Participantes</h2>
+      <div id="peopleList"></div>
+    </div>
+
+    <div class="footer-actions">
+      <button class="btn ghost" id="btnNew">Crear otra rifa</button>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<dialog id="dlg">
+  <form method="dialog" id="dlgForm">
+    <div>
+      <div class="dlg-num display" id="dNum"></div>
+      <p id="dInfo" class="empty"></p>
+    </div>
+    <div id="dNameBox">
+      <label>Tu nombre
+        <input type="text" id="dName" list="names" maxlength="30" autocomplete="off" placeholder="Ej.: María">
+      </label>
+      <datalist id="names"></datalist>
+    </div>
+    <div class="dlg-actions">
+      <button type="submit" class="btn" id="dOk" value="ok">Reservar número</button>
+      <button type="button" class="btn danger hidden" id="dFree">Liberar número</button>
+      <button type="button" class="btn ghost" id="dCancel">Cerrar</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getDatabase, ref, onValue, set, get, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  /* ============================================================
+     PEGA AQUÍ LA CONFIGURACIÓN DE TU PROYECTO DE FIREBASE
+     (Configuración del proyecto > Tus apps > Configuración de SDK)
+     ============================================================ */
+  const firebaseConfig = {
+    apiKey: "AIzaSyDRvXHXH977D21ug9EKTyAJU0HWdC5Jv14",
+    authDomain: "rifa-100.firebaseapp.com",
+    databaseURL: "https://rifa-100-default-rtdb.firebaseio.com",
+    projectId: "rifa-100",
+    storageBucket: "rifa-100.firebasestorage.app",
+    messagingSenderId: "175318660405",
+    appId: "1:175318660405:web:dec85922440306b16b487c"
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const rid = new URLSearchParams(location.search).get('r');
+  let db, uid, data = null, current = null;
+  let verifiedKey = null, verifiedOk = null;
+
+  /* ---------- utilidades ---------- */
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const rand100 = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return (a[0] % 100) + 1; };
+  const randHex = (n) => { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map((x) => x.toString(16).padStart(2, '0')).join(''); };
+  const randId = (n) => {
+    const abc = 'abcdefghjkmnpqrstuvwxyz23456789';
+    const a = new Uint8Array(n); crypto.getRandomValues(a);
+    return [...a].map((x) => abc[x % abc.length]).join('');
+  };
+  async function sha256(s) {
+    const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+    return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+  }
+  let toastTimer;
+  function aviso(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+  }
+  function mostrarMensaje(html) {
+    $('setup').classList.add('hidden');
+    $('game').classList.add('hidden');
+    $('msg').classList.remove('hidden');
+    $('msg').innerHTML = html;
+  }
+  const money = (n) => n.toLocaleString('es');
+
+  /* ---------- arranque ---------- */
+  async function boot() {
+    if (Object.values(firebaseConfig).some((v) => String(v).startsWith('PEGA'))) {
+      mostrarMensaje('<h2>Falta conectar la base de datos</h2><p>Abre <code>index.html</code> con un editor de texto y pega la configuración de tu proyecto de Firebase donde dice <code>PEGA_AQUI</code>.</p>');
+      return;
+    }
+    try {
+      const app = initializeApp(firebaseConfig);
+      db = getDatabase(app);
+      const cred = await signInAnonymously(getAuth(app));
+      uid = cred.user.uid;
+    } catch (e) {
+      mostrarMensaje('<h2>No se pudo conectar</h2><p>Revisa que la autenticación anónima esté activada en Firebase y que el dominio de esta página esté en la lista de dominios autorizados.</p><p class="empty">Detalle: ' + esc(e.code || e.message) + '</p>');
+      return;
+    }
+    if (!rid) {
+      $('setup').classList.remove('hidden');
+      return;
+    }
+    $('game').classList.remove('hidden');
+    buildBoard();
+    onValue(ref(db, 'rifas/' + rid), (snap) => {
+      data = snap.val();
+      if (!data || !data.info) {
+        mostrarMensaje('<h2>No encontramos esta rifa</h2><p>Revisa que el enlace esté completo.</p><button class="btn" onclick="location.href=location.pathname">Crear una rifa nueva</button>');
+        return;
+      }
+      render();
+    }, (err) => {
+      mostrarMensaje('<h2>No se pudo leer la rifa</h2><p class="empty">' + esc(err.code || err.message) + '</p>');
+    });
+  }
+
+  /* ---------- crear rifa ---------- */
+  $('btnStart').addEventListener('click', async () => {
+    const btn = $('btnStart');
+    btn.disabled = true;
+    try {
+      const titulo = $('inTitle').value.trim() || 'Rifa';
+      const premio = $('inPrize').value.trim();
+      const precio = parseFloat($('inPrice').value) || 0;
+      const secreto = rand100();
+      const sal = randHex(16);
+      const sello = await sha256(secreto + ':' + sal);
+      const id = randId(8);
+      const info = { titulo, precio, sello, org: uid };
+      if (premio) info.premio = premio;
+      await set(ref(db, 'rifas/' + id + '/info'), info);
+      await set(ref(db, 'privado/' + id), { secreto, sal });
+      location.search = '?r=' + id;
+    } catch (e) {
+      btn.disabled = false;
+      aviso('No se pudo crear la rifa. Revisa las reglas de la base de datos.');
+    }
+  });
+
+  /* ---------- tablero ---------- */
+  function buildBoard() {
+    const board = $('board');
+    board.innerHTML = '';
+    for (let n = 1; n <= 100; n++) {
+      const b = document.createElement('button');
+      b.className = 'cell';
+      b.dataset.n = n;
+      b.type = 'button';
+      b.addEventListener('click', () => openDialog(n));
+      board.appendChild(b);
+    }
+  }
+
+  const initials = (name) => {
+    const p = name.trim().split(/\s+/);
+    return p.length > 1 ? (p[0][0] + p[1][0]).toUpperCase() : name.slice(0, 3);
+  };
+
+  function render() {
+    const info = data.info;
+    const numeros = data.numeros || {};
+    const ganador = data.ganador || null;
+    const isOrg = info.org === uid;
+    const t = Object.keys(numeros).length;
+    const full = t === 100;
+
+    $('gTitle').textContent = info.titulo;
+    document.title = info.titulo;
+    if (info.premio) {
+      $('gPrize').innerHTML = 'Premio: <b>' + esc(info.premio) + '</b>';
+    } else {
+      $('gPrize').textContent = 'El sobre ya está sellado. ¡Elijan sus números!';
+    }
+    $('orgTag').classList.toggle('hidden', !isOrg);
+
+    $('cTaken').textContent = t;
+    $('bar').style.width = t + '%';
+
+    // línea de estado
+    let status;
+    if (ganador) status = 'Sobre abierto.';
+    else if (full) status = isOrg ? 'Tablero completo. Ya puedes abrir el sobre.' : 'Tablero completo. Esperando que el organizador abra el sobre.';
+    else if (info.precio) status = 'Recaudado: ' + money(t * info.precio) + ' de ' + money(100 * info.precio);
+    else status = 'Faltan ' + (100 - t) + ' números.';
+    $('statusLine').textContent = status;
+
+    // botón de abrir (solo organizador)
+    $('btnOpen').classList.toggle('hidden', !(isOrg && full && !ganador));
+
+    // sobre
+    $('env').classList.toggle('ready', full && !ganador);
+    $('env').classList.toggle('open', !!ganador);
+    $('secretNum').textContent = ganador ? ganador.numero : '?';
+
+    // celdas
+    document.querySelectorAll('.cell').forEach((c) => {
+      const n = +c.dataset.n;
+      const owner = numeros[n] && numeros[n].nombre;
+      c.className = 'cell';
+      if (owner) {
+        c.classList.add('taken');
+        c.innerHTML = n + '<em>' + esc(initials(owner)) + '</em>';
+        c.setAttribute('aria-label', 'Número ' + n + ', de ' + owner);
+      } else {
+        c.textContent = n;
+        c.setAttribute('aria-label', 'Número ' + n + ', disponible');
+      }
+      if (ganador) c.classList.add(n === ganador.numero ? 'winner' : 'lost');
+    });
+
+    renderBanner(ganador, numeros, info);
+    renderPeople(numeros, info);
+  }
+
+  async function renderBanner(ganador, numeros, info) {
+    const b = $('winnerBanner');
+    if (!ganador) { b.classList.add('hidden'); return; }
+    const key = ganador.numero + ':' + ganador.sal;
+    if (verifiedKey !== key) {
+      verifiedKey = key;
+      verifiedOk = (await sha256(key)) === info.sello;
+    }
+    const owner = numeros[ganador.numero] && numeros[ganador.numero].nombre;
+    b.innerHTML = '<p>El número ganador es el</p><p class="big display"></p><p class="who"></p><p class="proof"></p>';
+    b.querySelector('.big').textContent = ganador.numero;
+    b.querySelector('.who').textContent = 'Gana ' + (owner || 'nadie') + (info.premio ? ': ' + info.premio : '') + '.';
+    b.querySelector('.proof').textContent = verifiedOk
+      ? 'Verificado: este número coincide con el sello guardado cuando se creó la rifa.'
+      : 'Atención: este número no coincide con el sello original de la rifa.';
+    b.classList.remove('hidden');
+  }
+
+  function renderPeople(numeros, info) {
+    const map = new Map();
+    Object.keys(numeros).map(Number).sort((a, b) => a - b).forEach((n) => {
+      const name = numeros[n].nombre;
+      const key = name.trim().toLowerCase();
+      if (!map.has(key)) map.set(key, { name, nums: [] });
+      map.get(key).nums.push(n);
+    });
+    const list = [...map.values()].sort((a, b) => b.nums.length - a.nums.length || a.name.localeCompare(b.name, 'es'));
+    const box = $('peopleList');
+    box.innerHTML = '';
+    if (!list.length) box.innerHTML = '<p class="empty">Aún no hay nadie. Toca un número del tablero para reservarlo.</p>';
+    list.forEach((p) => {
+      const d = document.createElement('div');
+      d.className = 'person';
+      const b = document.createElement('b');
+      b.textContent = p.name + ' (' + p.nums.length + ')';
+      const s = document.createElement('span');
+      s.textContent = p.nums.join(', ') + (info.precio ? ' · debe ' + money(p.nums.length * info.precio) : '');
+      d.append(b, s);
+      box.appendChild(d);
+    });
+    $('names').innerHTML = list.map((p) => '<option value="' + esc(p.name) + '">').join('');
+  }
+
+  /* ---------- elegir / liberar número ---------- */
+  function openDialog(n) {
+    if (!data || data.ganador) return;
+    current = n;
+    const owner = data.numeros && data.numeros[n] && data.numeros[n].nombre;
+    const isOrg = data.info.org === uid;
+    $('dNum').textContent = 'Número ' + n;
+    if (owner) {
+      $('dInfo').textContent = 'Ya lo tiene ' + owner + '.';
+      $('dNameBox').classList.add('hidden');
+      $('dOk').classList.add('hidden');
+      $('dFree').classList.toggle('hidden', !isOrg);
+    } else {
+      $('dInfo').textContent = 'Está disponible.';
+      $('dNameBox').classList.remove('hidden');
+      $('dOk').classList.remove('hidden');
+      $('dFree').classList.add('hidden');
+      let saved = '';
+      try { saved = localStorage.getItem('rifa_nombre') || ''; } catch (e) {}
+      $('dName').value = saved;
+    }
+    $('dlg').showModal();
+    if (!owner) $('dName').focus();
+  }
+
+  $('dlgForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nombre = $('dName').value.trim();
+    if (!nombre) { $('dName').focus(); return; }
+    const n = current;
+    $('dOk').disabled = true;
+    try {
+      await set(ref(db, 'rifas/' + rid + '/numeros/' + n), { nombre });
+      try { localStorage.setItem('rifa_nombre', nombre); } catch (e2) {}
+      $('dlg').close();
+      aviso('Número ' + n + ' reservado para ' + nombre + '.');
+    } catch (err) {
+      $('dlg').close();
+      aviso('Ese número ya lo tomó otra persona. Elige otro.');
+    }
+    $('dOk').disabled = false;
+  });
+
+  $('dFree').addEventListener('click', async () => {
+    try {
+      await remove(ref(db, 'rifas/' + rid + '/numeros/' + current));
+      aviso('Número ' + current + ' liberado.');
+    } catch (e) {
+      aviso('No se pudo liberar el número.');
+    }
+    $('dlg').close();
+  });
+  $('dCancel').addEventListener('click', () => $('dlg').close());
+
+  /* ---------- abrir el sobre (solo organizador) ---------- */
+  $('btnOpen').addEventListener('click', async () => {
+    const btn = $('btnOpen');
+    btn.disabled = true;
+    try {
+      const snap = await get(ref(db, 'privado/' + rid));
+      const p = snap.val();
+      if (!p) throw new Error('sin-secreto');
+      await set(ref(db, 'rifas/' + rid + '/ganador'), { numero: p.secreto, sal: p.sal });
+    } catch (e) {
+      btn.disabled = false;
+      aviso('No se pudo abrir el sobre. Hazlo desde el mismo navegador donde creaste la rifa.');
+    }
+  });
+
+  /* ---------- compartir y otras acciones ---------- */
+  $('btnShare').addEventListener('click', async () => {
+    const url = location.href;
+    const title = data && data.info ? data.info.titulo : 'Rifa';
+    try {
+      if (navigator.share) { await navigator.share({ title, text: 'Elige tu número en la rifa', url }); return; }
+      await navigator.clipboard.writeText(url);
+      aviso('Enlace copiado.');
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      aviso('Copia el enlace desde la barra del navegador.');
+    }
+  });
+  $('btnNew').addEventListener('click', () => { location.href = location.pathname; });
+
+  boot();
+</script>
+</body>
+</html>
