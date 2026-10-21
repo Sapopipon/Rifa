@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0F4C45">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rifa 100">
 <title>Rifa de los 100 números</title>
 <style>
   :root {
@@ -271,6 +277,7 @@
 
   <!-- Crear rifa -->
   <section id="setup" class="setup hidden">
+    <button class="btn hidden" id="btnLast" type="button"></button>
     <h1>Rifa de los 100 números</h1>
     <p class="prize">Se guarda un número secreto en un sobre sellado. Cada persona elige su número desde su celular y, cuando se vendan los 100, el organizador abre el sobre: gana quien tenga ese número.</p>
     <label>Nombre de la rifa
@@ -419,6 +426,14 @@
     }
     if (!rid) {
       $('setup').classList.remove('hidden');
+      try {
+        const u = JSON.parse(localStorage.getItem('rifa_ultima') || 'null');
+        if (u && u.id) {
+          $('btnLast').textContent = 'Volver a: ' + (u.titulo || 'mi última rifa');
+          $('btnLast').classList.remove('hidden');
+          $('btnLast').addEventListener('click', () => { location.search = '?r=' + u.id; });
+        }
+      } catch (e) {}
       return;
     }
     $('game').classList.remove('hidden');
@@ -429,6 +444,7 @@
         mostrarMensaje('<h2>No encontramos esta rifa</h2><p>Revisa que el enlace esté completo.</p><button class="btn" onclick="location.href=location.pathname">Crear una rifa nueva</button>');
         return;
       }
+      try { localStorage.setItem('rifa_ultima', JSON.stringify({ id: rid, titulo: data.info.titulo })); } catch (e) {}
       render();
     }, (err) => {
       mostrarMensaje('<h2>No se pudo leer la rifa</h2><p class="empty">' + esc(err.code || err.message) + '</p>');
