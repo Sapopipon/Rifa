@@ -517,7 +517,7 @@
     let status;
     if (ganador) status = 'Sobre abierto.';
     else if (full) status = isOrg ? 'Tablero completo. Ya puedes abrir el sobre.' : 'Tablero completo. Esperando que el organizador abra el sobre.';
-    else if (info.precio) status = 'Recaudado: ' + money(t * info.precio) + ' de ' + money(100 * info.precio);
+    else if (info.precio && isOrg) status = 'Recaudado: ' + money(t * info.precio) + ' de ' + money(100 * info.precio);
     else status = 'Faltan ' + (100 - t) + ' números.';
     $('statusLine').textContent = status;
 
@@ -546,7 +546,7 @@
     });
 
     renderBanner(ganador, numeros, info);
-    renderPeople(numeros, info);
+    renderPeople(numeros, info, isOrg);
   }
 
   async function renderBanner(ganador, numeros, info) {
@@ -567,7 +567,7 @@
     b.classList.remove('hidden');
   }
 
-  function renderPeople(numeros, info) {
+  function renderPeople(numeros, info, isOrg) {
     const map = new Map();
     Object.keys(numeros).map(Number).sort((a, b) => a - b).forEach((n) => {
       const name = numeros[n].nombre;
@@ -585,7 +585,7 @@
       const b = document.createElement('b');
       b.textContent = p.name + ' (' + p.nums.length + ')';
       const s = document.createElement('span');
-      s.textContent = p.nums.join(', ') + (info.precio ? ' · debe ' + money(p.nums.length * info.precio) : '');
+      s.textContent = p.nums.join(', ') + (info.precio && isOrg ? ' · debe ' + money(p.nums.length * info.precio) : '');
       d.append(b, s);
       box.appendChild(d);
     });
