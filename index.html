@@ -245,6 +245,7 @@
   .cell.mine { box-shadow: 0 0 0 3px var(--gold); }
   .cell.unpaid { box-shadow: inset 0 0 0 3px var(--coral); }
   .rev { flex-wrap: wrap; }
+  .rev select { font: inherit; padding: 6px; border-radius: 8px; border: 2px solid var(--line); background: var(--page); color: var(--text); max-width: 100%; }
   .rev .btn { min-height: 36px; padding: 6px 12px; font-size: .85rem; }
   .toast {
     position: fixed; left: 50%; bottom: 18px;
@@ -330,13 +331,15 @@
     <div class="board" id="board" role="group" aria-label="Tablero de números"></div>
 
     <div class="people hidden" id="revBox">
-      <h2>Revendedores</h2>
-      <div id="revList"></div>
+      <h2>Cartones</h2>
+      <div id="pqList"></div>
       <div class="setup" style="margin-top:8px">
-        <label>Nombre del revendedor<input type="text" id="rvNombre" maxlength="30"></label>
-        <label>Números de su cartón <small>Ej.: 1-10, 25, 40-45</small><input type="text" id="rvNums"></label>
+        <label>Nombre del cartón <small>Opcional</small><input type="text" id="rvNombre" maxlength="30"></label>
+        <label>Números del cartón <small>Ej.: 1-10, 25, 40-45</small><input type="text" id="rvNums"></label>
         <button class="btn" id="rvCrear" type="button">Crear cartón</button>
       </div>
+      <h2 style="margin-top:14px">Revendedores</h2>
+      <div id="revList"></div>
     </div>
 
     <div class="people hidden" id="cartonBox">
@@ -402,7 +405,7 @@
   const $ = (id) => document.getElementById(id);
   const rid = new URLSearchParams(location.search).get('r');
   let db, uid, data = null, current = null;
-  let miVend = null, vendedores = {}, subV = false;
+  let miVend = null, vendedores = {}, paquetes = {}, subV = false;
   const tokV = new URLSearchParams(location.search).get('v');
   let verifiedKey = null, verifiedOk = null;
 
@@ -489,6 +492,11 @@
         onValue(ref(db, 'vendedores/' + rid), (sv) => {
           vendedores = sv.val() || {};
           Object.values(vendedores).forEach((v) => { v.cupos = norm(v.cupos); });
+          render();
+        });
+        onValue(ref(db, 'paquetes/' + rid), (sp) => {
+          paquetes = sp.val() || {};
+          Object.values(paquetes).forEach((q) => { q.nums = norm(q.nums); });
           render();
         });
       }
@@ -671,11 +679,11 @@
         $('dFree').classList.remove('hidden');
       }
     } else if (carton && !gestiona) {
-      $('dInfo').textContent = 'Reservado para el cartón de ' + carton + '.';
+      $('dInfo').textContent = 'Reservado: ' + carton + '.';
     } else if (miVend && !gestiona) {
       $('dInfo').textContent = 'No es de tu cartón.';
     } else {
-      $('dInfo').textContent = carton ? 'Cartón de ' + carton + '.' : 'Está disponible.';
+      $('dInfo').textContent = carton ? 'Cartón: ' + carton + '.' : 'Está disponible.';
       $('dNameBox').classList.remove('hidden');
       $('dOk').classList.remove('hidden');
       $('dOk').textContent = gestiona ? 'Asignar número' : 'Reservar número';
@@ -720,7 +728,7 @@
   });
   $('dCancel').addEventListener('click', () => $('dlg').close());
 
-  /* ---------- revendedores ---------- */
+  /* ---------- cartones y revendedores ---------- */
   function parseNums(txt) {
     const out = new Set();
     txt.split(/[,\s]+/).filter(Boolean).forEach((p) => {
@@ -733,12 +741,12 @@
   }
 
   $('rvCrear').addEventListener('click', async () => {
-    const nombre = $('rvNombre').value.trim();
     const nums = parseNums($('rvNums').value).filter((n) => !data.numeros[n] && !data.cartones[n]);
-    if (!nombre || !nums.length) { aviso('Escribe el nombre y al menos un número libre.'); return; }
-    const tok = randId(20), cupos = {}, up = {};
-    nums.forEach((n) => { cupos[n] = true; up['rifas/' + rid + '/cartones/' + n] = nombre; });
-    up['vendedores/' + rid + '/' + tok] = { nombre, cupos };
+    if (!nums.length) { aviso('Escribe al menos un número libre.'); return; }
+    const nombre = $('rvNombre').value.trim() || 'Cartón ' + (Object.keys(paquetes).length + 1);
+    const pid = randId(8), ns = {}, up = {};
+    nums.forEach((n) => { ns[n] = true; up['rifas/' + rid + '/cartones/' + n] = nombre; });
+    up['paquetes/' + rid + '/' + pid] = { nombre, nums: ns };
     try {
       await update(ref(db), up);
       $('rvNombre').value = ''; $('rvNums').value = '';
@@ -746,11 +754,53 @@
     } catch (e) { aviso('No se pudo crear el cartón.'); }
   });
 
+  async function entregar(pid, sel) {
+    const q = paquetes[pid];
+    if (!q) return;
+    let tok = sel, nomV = '';
+    if (sel === '__nuevo') {
+      nomV = (prompt('Nombre del revendedor:') || '').trim();
+      if (!nomV) { render(); return; }
+      tok = randId(20);
+    } else if (sel) nomV = vendedores[sel].nombre;
+    const ids = Object.keys(q.nums), up = {};
+    if (q.vend && vendedores[q.vend]) ids.forEach((n) => { up['vendedores/' + rid + '/' + q.vend + '/cupos/' + n] = null; });
+    ids.forEach((n) => { up['rifas/' + rid + '/cartones/' + n] = sel ? nomV : q.nombre; });
+    if (sel) {
+      const libres = ids.filter((n) => !data.numeros[n]);
+      if (sel === '__nuevo') {
+        const cupos = {};
+        libres.forEach((n) => { cupos[n] = true; });
+        up['vendedores/' + rid + '/' + tok] = libres.length ? { nombre: nomV, cupos } : { nombre: nomV };
+      } else libres.forEach((n) => { up['vendedores/' + rid + '/' + tok + '/cupos/' + n] = true; });
+    }
+    up['paquetes/' + rid + '/' + pid + '/vend'] = sel ? tok : null;
+    try { await update(ref(db), up); aviso(sel ? 'Cartón entregado a ' + nomV + '.' : 'Cartón sin entregar.'); }
+    catch (e) { aviso('No se pudo entregar el cartón.'); render(); }
+  }
+
+  async function borrarPaquete(pid) {
+    const q = paquetes[pid];
+    if (!confirm('¿Eliminar "' + q.nombre + '"? Sus números sin vender quedarán libres.')) return;
+    const up = {};
+    up['paquetes/' + rid + '/' + pid] = null;
+    Object.keys(q.nums).forEach((n) => {
+      up['rifas/' + rid + '/cartones/' + n] = null;
+      if (q.vend && vendedores[q.vend]) up['vendedores/' + rid + '/' + q.vend + '/cupos/' + n] = null;
+    });
+    try { await update(ref(db), up); } catch (e) { aviso('No se pudo eliminar el cartón.'); }
+  }
+
   async function borrarVend(tok, v) {
-    if (!confirm('¿Eliminar a ' + v.nombre + '? Sus números sin vender quedarán libres.')) return;
+    if (!confirm('¿Eliminar a ' + v.nombre + '? Sus cartones quedarán sin entregar.')) return;
     const up = {};
     up['vendedores/' + rid + '/' + tok] = null;
     Object.keys(v.cupos).forEach((n) => { up['rifas/' + rid + '/cartones/' + n] = null; });
+    Object.entries(paquetes).forEach(([pid, q]) => {
+      if (q.vend !== tok) return;
+      up['paquetes/' + rid + '/' + pid + '/vend'] = null;
+      Object.keys(q.nums).forEach((n) => { up['rifas/' + rid + '/cartones/' + n] = q.nombre; });
+    });
     try { await update(ref(db), up); } catch (e) { aviso('No se pudo eliminar.'); }
   }
 
@@ -763,29 +813,50 @@
   }
 
   function btn(txt, fn, cls) { const x = document.createElement('button'); x.type = 'button'; x.className = 'btn ' + (cls || 'ghost'); x.textContent = txt; x.onclick = fn; return x; }
+  function fila(titulo, detalle, ...extra) {
+    const d = document.createElement('div');
+    d.className = 'person rev';
+    const t = document.createElement('b'); t.textContent = titulo;
+    const sm = document.createElement('span'); sm.textContent = detalle;
+    d.append(t, sm, ...extra);
+    return d;
+  }
 
   function renderRev(numeros, info, isOrg) {
     $('revBox').classList.toggle('hidden', !isOrg);
     $('cartonBox').classList.toggle('hidden', !miVend);
     if (isOrg) {
+      const pl = $('pqList');
+      pl.innerHTML = '';
+      const pq = Object.entries(paquetes);
+      if (!pq.length) pl.innerHTML = '<p class="empty">Aún no hay cartones. Crea uno abajo.</p>';
+      pq.forEach(([pid, q]) => {
+        const ids = Object.keys(q.nums).sort((x, y) => x - y);
+        const vend = q.vend && vendedores[q.vend];
+        const sel = document.createElement('select');
+        sel.setAttribute('aria-label', 'Entregar cartón');
+        sel.innerHTML = '<option value="">Sin entregar</option>' +
+          Object.entries(vendedores).map(([k, v]) => '<option value="' + k + '">' + esc(v.nombre) + '</option>').join('') +
+          '<option value="__nuevo">+ Nuevo revendedor…</option>';
+        sel.value = vend ? q.vend : '';
+        sel.onchange = () => entregar(pid, sel.value);
+        pl.appendChild(fila(q.nombre + ' (' + ids.filter((k) => numeros[k]).length + '/' + ids.length + ')',
+          ids.join(', ') + ' · ' + (vend ? 'de ' + vend.nombre : 'sin entregar'), sel, btn('Eliminar', () => borrarPaquete(pid), 'danger')));
+      });
+
       const box = $('revList');
       box.innerHTML = '';
       const ents = Object.entries(vendedores);
-      if (!ents.length) box.innerHTML = '<p class="empty">Aún no hay revendedores.</p>';
+      if (!ents.length) box.innerHTML = '<p class="empty">Aún no hay revendedores. Entrega un cartón y elige "+ Nuevo revendedor".</p>';
       ents.forEach(([tok, v]) => {
-        const ids = Object.keys(v.cupos).sort((x, y) => x - y);
+        const ids = Object.keys(v.cupos);
         const vs = ids.filter((k) => numeros[k]);
         const sp = vs.filter((k) => numeros[k].pagado !== true).length;
-        const d = document.createElement('div');
-        d.className = 'person rev';
-        const t = document.createElement('b');
-        t.textContent = v.nombre + ' (' + vs.length + '/' + ids.length + ')';
-        const sm = document.createElement('span');
-        sm.textContent = ids.join(', ') + ' · sin pagar: ' + sp + (info.precio ? ' (' + money(sp * info.precio) + ')' : '');
-        d.append(t, sm,
+        const nombres = Object.values(paquetes).filter((q) => q.vend === tok).map((q) => q.nombre).join(', ') || 'sin cartones';
+        box.appendChild(fila(v.nombre + ' (' + vs.length + '/' + ids.length + ')',
+          nombres + ' · sin pagar: ' + sp + (info.precio ? ' (' + money(sp * info.precio) + ')' : ''),
           btn('Copiar enlace', () => copiar(location.origin + location.pathname + '?r=' + rid + '&v=' + tok)),
-          btn('Eliminar', () => borrarVend(tok, v), 'danger'));
-        box.appendChild(d);
+          btn('Eliminar', () => borrarVend(tok, v), 'danger')));
       });
     }
     if (miVend) {
@@ -795,8 +866,7 @@
         const r = numeros[k];
         const d = document.createElement('div');
         d.className = 'person';
-        const t = document.createElement('b');
-        t.textContent = k;
+        const t = document.createElement('b'); t.textContent = k;
         const sm = document.createElement('span');
         sm.textContent = r ? r.nombre + (r.pagado === true ? ' · pagó' : ' · sin pagar') : 'libre';
         d.append(t, sm);
