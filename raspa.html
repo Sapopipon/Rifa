@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F4C45">
+<title>Raspa y Gana</title>
+<style>
+  :root { --bg:#F6F3EC; --card:#fff; --tx:#1d1d1f; --mu:#6b6b70; --ac:#C8102E; --ok:#0a7d3c; --bd:#E3DED2; color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141416; --card:#1e1e22; --tx:#f2f2f4; --mu:#9a9aa2; --ac:#ff4d63; --ok:#3ddc84; --bd:#32323a; color-scheme: dark; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--tx); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; display:flex; justify-content:center; }
+  main { width:100%; max-width:460px; padding:16px 16px 56px; }
+  h1 { font-size:26px; margin:8px 0 4px; text-align:center; }
+  h2 { font-size:17px; margin:0 0 8px; }
+  .sub { color:var(--mu); text-align:center; margin:0 0 14px; font-size:14px; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:14px; padding:14px; margin-bottom:14px; }
+  .hidden { display:none !important; }
+  label { display:block; font-size:13px; color:var(--mu); margin:10px 0 3px; }
+  input { width:100%; padding:10px; border-radius:8px; border:1px solid var(--bd); background:var(--bg); color:var(--tx); font:inherit; }
+  button { font:inherit; border:0; border-radius:10px; padding:11px 14px; background:var(--ac); color:#fff; font-weight:700; cursor:pointer; }
+  button.full { width:100%; margin-top:12px; }
+  button.sec { background:transparent; color:var(--tx); border:1px solid var(--bd); }
+  button.sm { padding:6px 10px; font-size:13px; }
+  button:disabled { opacity:.5; }
+  .ticket { position:relative; height:120px; border-radius:12px; overflow:hidden; user-select:none; touch-action:none; }
+  .cells { position:absolute; inset:0; display:grid; grid-template-columns:repeat(3,1fr); background:#fff7d6; color:#222; }
+  .cells div { display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; border-right:1px dashed #d9c98a; text-align:center; }
+  .cells div:last-child { border:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; cursor:crosshair; }
+  #msg { text-align:center; font-weight:700; min-height:28px; margin:12px 0 0; font-size:17px; }
+  .win { color:var(--ok); }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--bd); font-size:14px; }
+  .row:last-child { border:0; }
+  .row .acts { display:flex; gap:6px; flex-wrap:wrap; }
+  .small { font-size:12px; color:var(--mu); margin-top:8px; }
+  .toast { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:#1d1d1f; color:#fff; padding:11px 16px; border-radius:12px; opacity:0; pointer-events:none; transition:opacity .25s; max-width:92vw; text-align:center; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">🎟️ Raspa y Gana</h1>
+  <p class="sub" id="sub"></p>
+
+  <div id="msgBox" class="card hidden"></div>
+
+  <!-- Crear juego -->
+  <section id="create" class="card hidden">
+    <button class="sec full hidden" id="btnLast" style="margin-top:0"></button>
+    <h2>Crear juego</h2>
+    <label>Nombre del juego</label><input id="cTitle" value="Raspa y Gana" maxlength="40">
+    <label>Precio del boleto (₲)</label><input id="cPrice" type="number" min="1" value="5000">
+    <label>% de ingresos destinado a premios (máx. 90)</label><input id="cPct" type="number" min="1" max="90" value="60">
+    <label>Premios <small>(múltiplos del precio, separados por coma)</small></label><input id="cPr" value="1,2,5,10,50">
+    <button class="full" id="btnCreate">Crear juego</button>
+    <p class="small">Cada boleto que vendas suma al fondo de premios el porcentaje que elijas. Un premio solo sale si el fondo alcanza para pagarlo.</p>
+  </section>
+
+  <!-- Panel del organizador -->
+  <section id="admin" class="hidden">
+    <div class="card"><button class="full" id="btnSell" style="margin-top:0">Vender boleto</button>
+      <p class="small">Cada venta crea un boleto con su resultado ya sorteado y abre el menú para enviar el enlace al comprador.</p></div>
+    <div class="card"><h2>Resumen</h2><div id="stats"></div></div>
+    <div class="card"><h2>Premios por entregar</h2><div id="pend"></div></div>
+    <div class="card"><h2>Configuración</h2>
+      <label>Precio del boleto (₲)</label><input id="aPrice" type="number" min="1">
+      <label>% de ingresos destinado a premios (máx. 90)</label><input id="aPct" type="number" min="1" max="90">
+      <label>Premios (múltiplos del precio, separados por coma)</label><input id="aPr">
+      <button class="sec full" id="btnSave">Guardar configuración</button>
+      <p class="small">El fondo solo crece con cada venta y un premio solo sale si el fondo lo cubre. Así los premios nunca superan el % configurado.</p></div>
+    <div class="card"><h2>Boletos</h2><div id="list"></div></div>
+  </section>
+
+  <!-- Boleto del jugador -->
+  <section id="play" class="card hidden">
+    <div class="ticket" id="ticket">
+      <div class="cells" id="cells"><div>?</div><div>?</div><div>?</div></div>
+      <canvas id="cv"></canvas>
+    </div>
+    <div id="msg"></div>
+    <p class="small" id="hint">Raspa con el dedo los 3 espacios. Si salen 3 montos iguales, ganas.</p>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getDatabase, ref, onValue, set, get, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDRvXHXH977D21ug9EKTyAJU0HWdC5Jv14",
+    authDomain: "rifa-100.firebaseapp.com",
+    databaseURL: "https://rifa-100-default-rtdb.firebaseio.com",
+    projectId: "rifa-100",
+    storageBucket: "rifa-100.firebasestorage.app",
+    messagingSenderId: "175318660405",
+    appId: "1:175318660405:web:dec85922440306b16b487c"
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const P = new URLSearchParams(location.search), jid = P.get('j'), cid = P.get('c');
+  const fmt = (n) => Math.round(n).toLocaleString('es-PY') + ' ₲';
+  let db, uid, info = null, estado = null, cfgListo = false, cartas = {}, resultados = {};
+
+  const randId = (n) => { const abc = 'abcdefghjkmnpqrstuvwxyz23456789', a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map((x) => abc[x % abc.length]).join(''); };
+  const randInt = (n) => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; };
+  let tt; const aviso = (m) => { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 3000); };
+  const mensaje = (h) => { ['create', 'admin', 'play'].forEach((x) => $(x).classList.add('hidden')); $('msgBox').classList.remove('hidden'); $('msgBox').innerHTML = h; };
+  const link = (k) => location.origin + location.pathname + '?j=' + jid + '&c=' + k;
+  async function compartir(url) { try { if (navigator.share) { await navigator.share({ url }); return; } await navigator.clipboard.writeText(url); aviso('Enlace copiado.'); } catch (e) {} }
+
+  async function boot() {
+    try {
+      const app = initializeApp(firebaseConfig);
+      db = getDatabase(app);
+      uid = (await signInAnonymously(getAuth(app))).user.uid;
+    } catch (e) { mensaje('<h2>No se pudo conectar</h2><p>' + (e.code || e.message) + '</p>'); return; }
+    if (!jid) {
+      $('create').classList.remove('hidden');
+      try { const u = JSON.parse(localStorage.getItem('raspa_ultimo') || 'null'); if (u) { $('btnLast').textContent = 'Volver a: ' + u.titulo; $('btnLast').classList.remove('hidden'); $('btnLast').onclick = () => { location.search = '?j=' + u.id; }; } } catch (e) {}
+      return;
+    }
+    onValue(ref(db, 'raspa/' + jid + '/info'), (s) => {
+      info = s.val();
+      if (!info) { mensaje('<h2>No encontramos este juego</h2><p>Revisa el enlace.</p>'); return; }
+      $('title').textContent = '🎟️ ' + info.titulo;
+      if (cid) return jugador();
+      if (info.org !== uid) { mensaje('<h2>Pide tu boleto</h2><p>Este enlace no es de un boleto. Pídele el tuyo al organizador.</p>'); return; }
+      try { localStorage.setItem('raspa_ultimo', JSON.stringify({ id: jid, titulo: info.titulo })); } catch (e) {}
+      if (!window._adm) { window._adm = true; admin(); }
+    });
+  }
+
+  /* ---------- crear ---------- */
+  const parseMult = (t) => t.split(',').map((x) => +x.trim()).filter((n) => n > 0).sort((a, b) => a - b);
+  const rnd = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; };
+  $('btnCreate').onclick = async () => {
+    const precio = Math.max(1, Math.round(+$('cPrice').value) || 5000);
+    const pct = Math.min(90, Math.max(1, +$('cPct').value || 60));
+    const mult = parseMult($('cPr').value);
+    if (!mult.length) { aviso('Escribe al menos un premio.'); return; }
+    const id = randId(8), titulo = $('cTitle').value.trim() || 'Raspa y Gana';
+    $('btnCreate').disabled = true;
+    try {
+      await set(ref(db, 'raspa/' + id + '/info'), { titulo, org: uid, pct, premios: mult.map((m) => m * precio) });
+      await set(ref(db, 'raspa/' + id + '/estado'), { precio, pct, premios: mult, rev: 0, paid: 0, pool: 0, sold: 0, wins: 0 });
+      location.search = '?j=' + id;
+    } catch (e) { $('btnCreate').disabled = false; aviso('No se pudo crear el juego. Revisa las reglas de Firebase.'); }
+  };
+
+  /* ---------- organizador ---------- */
+  function admin() {
+    $('create').classList.add('hidden'); $('msgBox').classList.add('hidden'); $('admin').classList.remove('hidden');
+    $('sub').textContent = 'Panel del organizador';
+    onValue(ref(db, 'raspa/' + jid + '/estado'), (s) => { estado = s.val(); pintar(); });
+    onValue(ref(db, 'raspa/' + jid + '/cartas'), (s) => { cartas = s.val() || {}; pintar(); });
+    onValue(ref(db, 'raspa/' + jid + '/resultados'), (s) => { resultados = s.val() || {}; pintar(); });
+  }
+  const mk = (txt, fn, cls) => { const b = document.createElement('button'); b.className = 'sm ' + (cls || 'sec'); b.textContent = txt; b.onclick = fn; return b; };
+  const mults = () => Object.values((estado && estado.premios) || {});
+
+  // El resultado se sortea aquí, al vender, y queda guardado donde solo el organizador lo lee
+  async function vender() {
+    if (!estado) return;
+    const e = { ...estado, premios: mults() };
+    e.rev += e.precio; e.sold++; e.pool += e.precio * e.pct / 100;
+    const opts = e.premios.map((m) => m * e.precio).filter((a) => a <= e.pool);
+    let win = 0;
+    if (opts.length && rnd() < Math.min(0.5, e.pool / (e.precio * 8))) {
+      const w = opts.map((_, i) => 1 / Math.pow(2, i));
+      let r = rnd() * w.reduce((a, b) => a + b, 0), i = 0;
+      while (i < w.length - 1 && r > w[i]) { r -= w[i]; i++; }
+      win = opts[i];
+    }
+    if (win) { e.pool -= win; e.paid += win; e.wins++; }
+    const k = randId(12), up = {};
+    up['raspa/' + jid + '/estado'] = e;
+    up['raspa/' + jid + '/cartas/' + k] = { ok: true, n: e.sold };
+    up['raspa/' + jid + '/resultados/' + k] = win;
+    $('btnSell').disabled = true;
+    try { await update(ref(db), up); compartir(link(k)); }
+    catch (err) { aviso('No se pudo crear el boleto.'); }
+    $('btnSell').disabled = false;
+  }
+  $('btnSell').onclick = vender;
+
+  $('btnSave').onclick = async () => {
+    const precio = Math.max(1, Math.round(+$('aPrice').value) || estado.precio);
+    const pct = Math.min(90, Math.max(1, +$('aPct').value || estado.pct));
+    const mult = parseMult($('aPr').value);
+    if (!mult.length) { aviso('Escribe al menos un premio.'); return; }
+    const up = {};
+    up['raspa/' + jid + '/estado/precio'] = precio; up['raspa/' + jid + '/estado/pct'] = pct; up['raspa/' + jid + '/estado/premios'] = mult;
+    up['raspa/' + jid + '/info/pct'] = pct; up['raspa/' + jid + '/info/premios'] = mult.map((m) => m * precio);
+    try { await update(ref(db), up); aviso('Configuración guardada.'); } catch (e) { aviso('No se pudo guardar.'); }
+  };
+
+  const marcar = (k, campo, v) => set(ref(db, 'raspa/' + jid + '/cartas/' + k + '/' + campo), v).catch(() => aviso('No se pudo guardar.'));
+  function pintar() {
+    if (!estado) return;
+    if (!cfgListo) { cfgListo = true; $('aPrice').value = estado.precio; $('aPct').value = estado.pct; $('aPr').value = mults().join(','); }
+    $('btnSell').textContent = 'Vender boleto (' + fmt(estado.precio) + ')';
+    $('stats').innerHTML = [['Ingresos', fmt(estado.rev)], ['Premios pagados', fmt(estado.paid)], ['Fondo de premios disponible', fmt(estado.pool)],
+      ['<b>Ganancia del dueño</b>', '<b>' + fmt(estado.rev - estado.paid) + '</b>'], ['Boletos vendidos / ganadores', estado.sold + ' / ' + estado.wins]]
+      .map(([a, b]) => '<div class="row"><span>' + a + '</span><span>' + b + '</span></div>').join('');
+    const ids = Object.keys(cartas).sort((a, b) => cartas[b].n - cartas[a].n);
+    const gan = ids.filter((k) => cartas[k].raspada && resultados[k] > 0 && !cartas[k].entregado);
+    const pe = $('pend'); pe.innerHTML = gan.length ? '' : '<p class="small">No hay premios pendientes de entregar.</p>';
+    gan.forEach((k) => { const d = document.createElement('div'); d.className = 'row'; d.innerHTML = '<span>Boleto #' + cartas[k].n + ' · <b>' + fmt(resultados[k]) + '</b></span>'; d.appendChild(mk('Marcar entregado', () => marcar(k, 'entregado', true))); pe.appendChild(d); });
+    const li = $('list'); li.innerHTML = ids.length ? '' : '<p class="small">Aún no has vendido boletos.</p>';
+    ids.forEach((k) => {
+      const c = cartas[k], d = document.createElement('div'); d.className = 'row';
+      const est = c.raspada ? (resultados[k] > 0 ? 'ganó ' + fmt(resultados[k]) + (c.entregado ? ' (entregado)' : '') : 'raspado, sin premio') : 'sin raspar';
+      d.innerHTML = '<span>#' + c.n + ' · ' + est + '</span>';
+      d.appendChild(mk('Copiar enlace', () => compartir(link(k)))); li.appendChild(d);
+    });
+  }
+
+  /* ---------- jugador ---------- */
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  let revealed = false, started = false, monto = null;
+  function cubrir() {
+    const r = $('ticket').getBoundingClientRect(); cv.width = r.width; cv.height = r.height;
+    ctx.globalCompositeOperation = 'source-over';
+    const g = ctx.createLinearGradient(0, 0, r.width, r.height); g.addColorStop(0, '#b8b8c0'); g.addColorStop(1, '#8e8e98');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, r.width, r.height);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 18px system-ui'; ctx.textAlign = 'center'; ctx.fillText('RASPA AQUÍ', r.width / 2, r.height / 2 + 6);
+  }
+  function celdas(m) {
+    const cs = $('cells').children, pr = (info.premios || []).map(fmt);
+    if (m > 0) { for (const c of cs) c.textContent = fmt(m); return; }
+    const pool = pr.length > 1 ? pr : [fmt(1000), fmt(2000), fmt(5000)], a = [0, 1, 2].map(() => pool[randInt(pool.length)]);
+    if (a[0] === a[1] && a[1] === a[2]) a[2] = pool[(pool.indexOf(a[2]) + 1) % pool.length];
+    a.forEach((t, i) => { cs[i].textContent = t; });
+  }
+  function resultado(m, entregado) {
+    $('msg').innerHTML = m > 0 ? '<span class="win">¡Ganaste ' + fmt(m) + '! 🎉</span>' : 'Sin premio esta vez.';
+    $('hint').textContent = m > 0 ? (entregado ? 'Premio ya entregado.' : 'Muestra este boleto al organizador para cobrar tu premio.') : 'Gracias por jugar.';
+  }
+  function revelar() { if (revealed) return; revealed = true; ctx.clearRect(0, 0, cv.width, cv.height); resultado(monto || 0, false); }
+  function limpio() { const d = ctx.getImageData(0, 0, cv.width, cv.height).data; let c = 0, n = 0; for (let i = 3; i < d.length; i += 16) { n++; if (d[i] === 0) c++; } if (c / n > 0.55) revelar(); }
+  function raspar(e) { if (revealed) return; const r = cv.getBoundingClientRect(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(e.clientX - r.left, e.clientY - r.top, 16, 0, 7); ctx.fill(); }
+  async function empezar() {
+    if (started) return; started = true;
+    try { await set(ref(db, 'raspa/' + jid + '/cartas/' + cid + '/raspada'), true); } catch (e) {}
+    try { const s = await get(ref(db, 'raspa/' + jid + '/resultados/' + cid)); monto = s.val(); celdas(monto || 0); }
+    catch (e) { aviso('No se pudo leer tu boleto. Intenta de nuevo.'); started = false; }
+  }
+  let down = false, init = false;
+  function jugador() {
+    $('create').classList.add('hidden'); $('admin').classList.add('hidden'); $('msgBox').classList.add('hidden'); $('play').classList.remove('hidden');
+    if (init) return; init = true;
+    if (info.pct) $('hint').textContent += ' El ' + info.pct + '% de lo recaudado se reparte en premios.';
+    onValue(ref(db, 'raspa/' + jid + '/cartas/' + cid), async (s) => {
+      const c = s.val();
+      if (!c) { mensaje('<h2>Boleto no válido</h2><p>Revisa que el enlace esté completo.</p>'); return; }
+      $('sub').textContent = 'Boleto #' + c.n;
+      if (c.raspada && !started && !revealed) {
+        revealed = true; ctx.clearRect(0, 0, cv.width, cv.height); cv.classList.add('hidden');
+        try { const r = await get(ref(db, 'raspa/' + jid + '/resultados/' + cid)); monto = r.val() || 0; celdas(monto); resultado(monto, !!c.entregado); }
+        catch (e) { $('msg').textContent = 'Este boleto ya fue raspado.'; }
+      } else if (revealed && monto > 0) resultado(monto, !!c.entregado);
+    });
+    cubrir();
+    cv.addEventListener('pointerdown', (e) => { down = true; cv.setPointerCapture(e.pointerId); empezar(); raspar(e); });
+    cv.addEventListener('pointermove', (e) => { if (down) raspar(e); });
+    cv.addEventListener('pointerup', () => { down = false; if (started) limpio(); });
+  }
+
+  boot();
+</script>
+</body>
+</html>
