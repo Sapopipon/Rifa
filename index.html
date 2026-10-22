@@ -240,6 +240,12 @@
   }
   .panel-msg code { background: var(--page); padding: 2px 6px; border-radius: 6px; }
 
+  .cell.reserved { background: transparent; color: var(--ticket); box-shadow: inset 0 0 0 2px rgba(246,241,228,.45); opacity: .7; }
+  .cell.dim { opacity: .35; }
+  .cell.mine { box-shadow: 0 0 0 3px var(--gold); }
+  .cell.unpaid { box-shadow: inset 0 0 0 3px var(--coral); }
+  .rev { flex-wrap: wrap; }
+  .rev .btn { min-height: 36px; padding: 6px 12px; font-size: .85rem; }
   .toast {
     position: fixed; left: 50%; bottom: 18px;
     transform: translateX(-50%) translateY(20px);
@@ -323,6 +329,22 @@
 
     <div class="board" id="board" role="group" aria-label="Tablero de números"></div>
 
+    <div class="people hidden" id="revBox">
+      <h2>Revendedores</h2>
+      <div id="revList"></div>
+      <div class="setup" style="margin-top:8px">
+        <label>Nombre del revendedor<input type="text" id="rvNombre" maxlength="30"></label>
+        <label>Números de su cartón <small>Ej.: 1-10, 25, 40-45</small><input type="text" id="rvNums"></label>
+        <button class="btn" id="rvCrear" type="button">Crear cartón</button>
+      </div>
+    </div>
+
+    <div class="people hidden" id="cartonBox">
+      <h2>Mi cartón</h2>
+      <div id="cartonList"></div>
+      <p class="empty">Contorno rojo = número sin pagar.</p>
+    </div>
+
     <div class="people">
       <h2>Participantes</h2>
       <div id="peopleList"></div>
@@ -343,13 +365,15 @@
       <p id="dInfo" class="empty"></p>
     </div>
     <div id="dNameBox">
-      <label>Tu nombre
+      <label><span id="dLbl">Tu nombre</span>
         <input type="text" id="dName" list="names" maxlength="30" autocomplete="off" placeholder="Ej.: María">
       </label>
       <datalist id="names"></datalist>
     </div>
+    <label id="dPaidBox" class="hidden" style="grid-auto-flow:column;justify-content:start;align-items:center"><input type="checkbox" id="dPaid"> Ya pagó</label>
     <div class="dlg-actions">
       <button type="submit" class="btn" id="dOk" value="ok">Reservar número</button>
+      <button type="button" class="btn hidden" id="dPay"></button>
       <button type="button" class="btn danger hidden" id="dFree">Liberar número</button>
       <button type="button" class="btn ghost" id="dCancel">Cerrar</button>
     </div>
@@ -359,7 +383,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getDatabase, ref, onValue, set, get, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getDatabase, ref, onValue, set, get, remove, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
   /* ============================================================
      PEGA AQUÍ LA CONFIGURACIÓN DE TU PROYECTO DE FIREBASE
@@ -378,6 +402,8 @@
   const $ = (id) => document.getElementById(id);
   const rid = new URLSearchParams(location.search).get('r');
   let db, uid, data = null, current = null;
+  let miVend = null, vendedores = {}, subV = false;
+  const tokV = new URLSearchParams(location.search).get('v');
   let verifiedKey = null, verifiedOk = null;
 
   /* ---------- utilidades ---------- */
@@ -408,6 +434,8 @@
     $('msg').innerHTML = html;
   }
   const money = (n) => n.toLocaleString('es');
+  // Firebase devuelve arreglos cuando las claves son 1..100: lo normalizamos a objeto
+  const norm = (o) => { const r = {}; if (!o) return r; (Array.isArray(o) ? o.map((v, i) => [i, v]) : Object.entries(o)).forEach(([k, v]) => { if (v != null) r[k] = v; }); return r; };
 
   /* ---------- arranque ---------- */
   async function boot() {
@@ -431,20 +459,39 @@
         if (u && u.id) {
           $('btnLast').textContent = 'Volver a: ' + (u.titulo || 'mi última rifa');
           $('btnLast').classList.remove('hidden');
-          $('btnLast').addEventListener('click', () => { location.search = '?r=' + u.id; });
+          $('btnLast').addEventListener('click', () => { location.search = '?r=' + u.id + (u.v ? '&v=' + u.v : ''); });
         }
       } catch (e) {}
       return;
     }
     $('game').classList.remove('hidden');
     buildBoard();
+    if (tokV) {
+      onValue(ref(db, 'vendedores/' + rid + '/' + tokV), (sv) => {
+        miVend = sv.val();
+        if (miVend) {
+          miVend.cupos = norm(miVend.cupos);
+          set(ref(db, 'revs/' + rid + '/' + uid), tokV).catch(() => {});
+        } else aviso('El enlace de revendedor no es válido o fue eliminado.');
+        if (data) render();
+      });
+    }
     onValue(ref(db, 'rifas/' + rid), (snap) => {
       data = snap.val();
+      if (data) { data.numeros = norm(data.numeros); data.cartones = norm(data.cartones); }
       if (!data || !data.info) {
         mostrarMensaje('<h2>No encontramos esta rifa</h2><p>Revisa que el enlace esté completo.</p><button class="btn" onclick="location.href=location.pathname">Crear una rifa nueva</button>');
         return;
       }
-      try { localStorage.setItem('rifa_ultima', JSON.stringify({ id: rid, titulo: data.info.titulo })); } catch (e) {}
+      try { localStorage.setItem('rifa_ultima', JSON.stringify({ id: rid, titulo: data.info.titulo, v: tokV || '' })); } catch (e) {}
+      if (data.info.org === uid && !subV) {
+        subV = true;
+        onValue(ref(db, 'vendedores/' + rid), (sv) => {
+          vendedores = sv.val() || {};
+          Object.values(vendedores).forEach((v) => { v.cupos = norm(v.cupos); });
+          render();
+        });
+      }
       render();
     }, (err) => {
       mostrarMensaje('<h2>No se pudo leer la rifa</h2><p class="empty">' + esc(err.code || err.message) + '</p>');
@@ -508,7 +555,8 @@
     } else {
       $('gPrize').textContent = 'El sobre ya está sellado. ¡Elijan sus números!';
     }
-    $('orgTag').classList.toggle('hidden', !isOrg);
+    $('orgTag').textContent = isOrg ? 'Eres el organizador de esta rifa.' : 'Cartón de ' + (miVend ? miVend.nombre : '');
+    $('orgTag').classList.toggle('hidden', !isOrg && !miVend);
 
     $('cTaken').textContent = t;
     $('bar').style.width = t + '%';
@@ -517,8 +565,14 @@
     let status;
     if (ganador) status = 'Sobre abierto.';
     else if (full) status = isOrg ? 'Tablero completo. Ya puedes abrir el sobre.' : 'Tablero completo. Esperando que el organizador abra el sobre.';
-    else if (info.precio && isOrg) status = 'Recaudado: ' + money(t * info.precio) + ' de ' + money(100 * info.precio);
-    else status = 'Faltan ' + (100 - t) + ' números.';
+    else if (isOrg) {
+      const pg = Object.values(numeros).filter((x) => x.pagado === true).length;
+      status = info.precio ? 'Cobrado: ' + money(pg * info.precio) + ' · Por cobrar: ' + money((t - pg) * info.precio) : 'Pagados: ' + pg + ' · Sin pagar: ' + (t - pg);
+    } else if (miVend) {
+      const ids = Object.keys(miVend.cupos), vs = ids.filter((k) => numeros[k]);
+      const sp = vs.filter((k) => numeros[k].pagado !== true).length;
+      status = 'Tu cartón: ' + vs.length + ' de ' + ids.length + ' vendidos · ' + (info.precio ? 'por cobrar ' + money(sp * info.precio) : sp + ' sin pagar');
+    } else status = 'Faltan ' + (100 - t) + ' números.';
     $('statusLine').textContent = status;
 
     // botón de abrir (solo organizador)
@@ -542,11 +596,18 @@
         c.textContent = n;
         c.setAttribute('aria-label', 'Número ' + n + ', disponible');
       }
+      const carton = data.cartones[n];
+      const mio = !!(miVend && miVend.cupos[n]);
+      if (!owner && carton && !isOrg && !mio) c.classList.add('reserved');
+      if (miVend && !mio) c.classList.add('dim');
+      if (owner && (isOrg || mio) && numeros[n].pagado !== true) c.classList.add('unpaid');
+      if (!owner && mio) c.classList.add('mine');
       if (ganador) c.classList.add(n === ganador.numero ? 'winner' : 'lost');
     });
 
     renderBanner(ganador, numeros, info);
     renderPeople(numeros, info, isOrg);
+    renderRev(numeros, info, isOrg);
   }
 
   async function renderBanner(ganador, numeros, info) {
@@ -585,7 +646,7 @@
       const b = document.createElement('b');
       b.textContent = p.name + ' (' + p.nums.length + ')';
       const s = document.createElement('span');
-      s.textContent = p.nums.join(', ') + (info.precio && isOrg ? ' · debe ' + money(p.nums.length * info.precio) : '');
+      s.textContent = p.nums.join(', ') + (isOrg ? (() => { const u = p.nums.filter((n) => numeros[n].pagado !== true).length; return u ? ' · sin pagar: ' + u + (info.precio ? ' (' + money(u * info.precio) + ')' : '') : ' · pagado'; })() : '');
       d.append(b, s);
       box.appendChild(d);
     });
@@ -593,58 +654,156 @@
   }
 
   /* ---------- elegir / liberar número ---------- */
+  function esGestor(n) { return data.info.org === uid || !!(miVend && miVend.cupos[n]); }
+
   function openDialog(n) {
     if (!data || data.ganador) return;
     current = n;
-    const owner = data.numeros && data.numeros[n] && data.numeros[n].nombre;
-    const isOrg = data.info.org === uid;
+    const rec = data.numeros[n], carton = data.cartones[n], gestiona = esGestor(n);
     $('dNum').textContent = 'Número ' + n;
-    if (owner) {
-      $('dInfo').textContent = 'Ya lo tiene ' + owner + '.';
-      $('dNameBox').classList.add('hidden');
-      $('dOk').classList.add('hidden');
-      $('dFree').classList.toggle('hidden', !isOrg);
+    ['dNameBox', 'dPaidBox', 'dOk', 'dPay', 'dFree'].forEach((x) => $(x).classList.add('hidden'));
+    $('dLbl').textContent = gestiona ? 'Nombre del comprador' : 'Tu nombre';
+    if (rec) {
+      $('dInfo').textContent = 'Lo tiene ' + rec.nombre + (gestiona ? (rec.pagado === true ? ' (pagado).' : ' (sin pagar).') : '.');
+      if (gestiona) {
+        $('dPay').textContent = rec.pagado === true ? 'Marcar sin pagar' : 'Marcar como pagado';
+        $('dPay').classList.remove('hidden');
+        $('dFree').classList.remove('hidden');
+      }
+    } else if (carton && !gestiona) {
+      $('dInfo').textContent = 'Reservado para el cartón de ' + carton + '.';
+    } else if (miVend && !gestiona) {
+      $('dInfo').textContent = 'No es de tu cartón.';
     } else {
-      $('dInfo').textContent = 'Está disponible.';
+      $('dInfo').textContent = carton ? 'Cartón de ' + carton + '.' : 'Está disponible.';
       $('dNameBox').classList.remove('hidden');
       $('dOk').classList.remove('hidden');
-      $('dFree').classList.add('hidden');
+      $('dOk').textContent = gestiona ? 'Asignar número' : 'Reservar número';
       let saved = '';
-      try { saved = localStorage.getItem('rifa_nombre') || ''; } catch (e) {}
+      if (gestiona) { $('dPaidBox').classList.remove('hidden'); $('dPaid').checked = false; }
+      else { try { saved = localStorage.getItem('rifa_nombre') || ''; } catch (e) {} }
       $('dName').value = saved;
     }
     $('dlg').showModal();
-    if (!owner) $('dName').focus();
+    if (!rec && !$('dNameBox').classList.contains('hidden')) $('dName').focus();
   }
 
   $('dlgForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const nombre = $('dName').value.trim();
     if (!nombre) { $('dName').focus(); return; }
-    const n = current;
+    const n = current, gestiona = esGestor(n);
     $('dOk').disabled = true;
     try {
-      await set(ref(db, 'rifas/' + rid + '/numeros/' + n), { nombre });
-      try { localStorage.setItem('rifa_nombre', nombre); } catch (e2) {}
+      await set(ref(db, 'rifas/' + rid + '/numeros/' + n), { nombre, pagado: gestiona && $('dPaid').checked });
+      if (!gestiona) { try { localStorage.setItem('rifa_nombre', nombre); } catch (e2) {} }
       $('dlg').close();
       aviso('Número ' + n + ' reservado para ' + nombre + '.');
     } catch (err) {
       $('dlg').close();
-      aviso('Ese número ya lo tomó otra persona. Elige otro.');
+      aviso('No se pudo reservar ese número. Puede que ya lo hayan tomado.');
     }
     $('dOk').disabled = false;
   });
 
+  $('dPay').addEventListener('click', async () => {
+    const r = data.numeros[current];
+    try { await set(ref(db, 'rifas/' + rid + '/numeros/' + current + '/pagado'), !(r && r.pagado === true)); }
+    catch (e) { aviso('No se pudo cambiar el estado de pago.'); }
+    $('dlg').close();
+  });
+
   $('dFree').addEventListener('click', async () => {
-    try {
-      await remove(ref(db, 'rifas/' + rid + '/numeros/' + current));
-      aviso('Número ' + current + ' liberado.');
-    } catch (e) {
-      aviso('No se pudo liberar el número.');
-    }
+    try { await remove(ref(db, 'rifas/' + rid + '/numeros/' + current)); aviso('Número ' + current + ' liberado.'); }
+    catch (e) { aviso('No se pudo liberar el número.'); }
     $('dlg').close();
   });
   $('dCancel').addEventListener('click', () => $('dlg').close());
+
+  /* ---------- revendedores ---------- */
+  function parseNums(txt) {
+    const out = new Set();
+    txt.split(/[,\s]+/).filter(Boolean).forEach((p) => {
+      const m = p.match(/^(\d+)(?:-(\d+))?$/);
+      if (!m) return;
+      const x = +m[1], z = +(m[2] || m[1]);
+      for (let i = Math.min(x, z); i <= Math.max(x, z); i++) if (i >= 1 && i <= 100) out.add(i);
+    });
+    return [...out];
+  }
+
+  $('rvCrear').addEventListener('click', async () => {
+    const nombre = $('rvNombre').value.trim();
+    const nums = parseNums($('rvNums').value).filter((n) => !data.numeros[n] && !data.cartones[n]);
+    if (!nombre || !nums.length) { aviso('Escribe el nombre y al menos un número libre.'); return; }
+    const tok = randId(20), cupos = {}, up = {};
+    nums.forEach((n) => { cupos[n] = true; up['rifas/' + rid + '/cartones/' + n] = nombre; });
+    up['vendedores/' + rid + '/' + tok] = { nombre, cupos };
+    try {
+      await update(ref(db), up);
+      $('rvNombre').value = ''; $('rvNums').value = '';
+      aviso('Cartón creado con ' + nums.length + ' números.');
+    } catch (e) { aviso('No se pudo crear el cartón.'); }
+  });
+
+  async function borrarVend(tok, v) {
+    if (!confirm('¿Eliminar a ' + v.nombre + '? Sus números sin vender quedarán libres.')) return;
+    const up = {};
+    up['vendedores/' + rid + '/' + tok] = null;
+    Object.keys(v.cupos).forEach((n) => { up['rifas/' + rid + '/cartones/' + n] = null; });
+    try { await update(ref(db), up); } catch (e) { aviso('No se pudo eliminar.'); }
+  }
+
+  async function copiar(url) {
+    try {
+      if (navigator.share) { await navigator.share({ url }); return; }
+      await navigator.clipboard.writeText(url);
+      aviso('Enlace copiado.');
+    } catch (e) {}
+  }
+
+  function btn(txt, fn, cls) { const x = document.createElement('button'); x.type = 'button'; x.className = 'btn ' + (cls || 'ghost'); x.textContent = txt; x.onclick = fn; return x; }
+
+  function renderRev(numeros, info, isOrg) {
+    $('revBox').classList.toggle('hidden', !isOrg);
+    $('cartonBox').classList.toggle('hidden', !miVend);
+    if (isOrg) {
+      const box = $('revList');
+      box.innerHTML = '';
+      const ents = Object.entries(vendedores);
+      if (!ents.length) box.innerHTML = '<p class="empty">Aún no hay revendedores.</p>';
+      ents.forEach(([tok, v]) => {
+        const ids = Object.keys(v.cupos).sort((x, y) => x - y);
+        const vs = ids.filter((k) => numeros[k]);
+        const sp = vs.filter((k) => numeros[k].pagado !== true).length;
+        const d = document.createElement('div');
+        d.className = 'person rev';
+        const t = document.createElement('b');
+        t.textContent = v.nombre + ' (' + vs.length + '/' + ids.length + ')';
+        const sm = document.createElement('span');
+        sm.textContent = ids.join(', ') + ' · sin pagar: ' + sp + (info.precio ? ' (' + money(sp * info.precio) + ')' : '');
+        d.append(t, sm,
+          btn('Copiar enlace', () => copiar(location.origin + location.pathname + '?r=' + rid + '&v=' + tok)),
+          btn('Eliminar', () => borrarVend(tok, v), 'danger'));
+        box.appendChild(d);
+      });
+    }
+    if (miVend) {
+      const cl = $('cartonList');
+      cl.innerHTML = '';
+      Object.keys(miVend.cupos).sort((x, y) => x - y).forEach((k) => {
+        const r = numeros[k];
+        const d = document.createElement('div');
+        d.className = 'person';
+        const t = document.createElement('b');
+        t.textContent = k;
+        const sm = document.createElement('span');
+        sm.textContent = r ? r.nombre + (r.pagado === true ? ' · pagó' : ' · sin pagar') : 'libre';
+        d.append(t, sm);
+        cl.appendChild(d);
+      });
+    }
+  }
 
   /* ---------- abrir el sobre (solo organizador) ---------- */
   $('btnOpen').addEventListener('click', async () => {
@@ -663,7 +822,7 @@
 
   /* ---------- compartir y otras acciones ---------- */
   $('btnShare').addEventListener('click', async () => {
-    const url = location.href;
+    const url = location.origin + location.pathname + '?r=' + rid;
     const title = data && data.info ? data.info.titulo : 'Rifa';
     try {
       if (navigator.share) { await navigator.share({ title, text: 'Elige tu número en la rifa', url }); return; }
