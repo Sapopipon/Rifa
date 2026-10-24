@@ -282,9 +282,22 @@
   <!-- Mensajes de estado (config, errores, rifa no encontrada) -->
   <section id="msg" class="panel-msg hidden"></section>
 
+  <button class="btn hidden" id="btnLast" type="button" style="width:100%;margin-top:16px"></button>
+
+  <!-- Acceso del organizador -->
+  <section id="lock" class="setup hidden">
+    <h1>Acceso del organizador</h1>
+    <p class="prize">Solo quien tenga la clave puede crear rifas. Si eres participante, usa el enlace que te enviaron.</p>
+    <label>Clave
+      <input type="password" id="lkPw" autocomplete="current-password" maxlength="40">
+    </label>
+    <button class="btn" id="lkIn" type="button">Entrar</button>
+    <button class="btn ghost" id="lkNew" type="button">Crear la clave por primera vez</button>
+    <p class="prize" id="lkMsg"></p>
+  </section>
+
   <!-- Crear rifa -->
   <section id="setup" class="setup hidden">
-    <button class="btn hidden" id="btnLast" type="button"></button>
     <h1>Rifa de los 100 números</h1>
     <p class="prize">Se guarda un número secreto en un sobre sellado. Cada persona elige su número desde su celular y, cuando se vendan los 100, el organizador abre el sobre: gana quien tenga ese número.</p>
     <label>Nombre de la rifa
@@ -468,7 +481,6 @@
       return;
     }
     if (!rid) {
-      $('setup').classList.remove('hidden');
       try {
         const u = JSON.parse(localStorage.getItem('rifa_ultima') || 'null');
         if (u && u.id) {
@@ -477,6 +489,9 @@
           $('btnLast').addEventListener('click', () => { location.search = '?r=' + u.id + (u.v ? '&v=' + u.v : ''); });
         }
       } catch (e) {}
+      let ok = false;
+      try { ok = (await get(ref(db, 'autorizados/' + uid))).exists(); } catch (e) {}
+      $(ok ? 'setup' : 'lock').classList.remove('hidden');
       return;
     }
     $('game').classList.remove('hidden');
@@ -499,7 +514,7 @@
         ['numeros', 'cartones'].forEach((f) => Object.keys(data[f]).forEach((k) => { if (+k > NN) delete data[f][k]; }));
       }
       if (!data || !data.info) {
-        mostrarMensaje('<h2>No encontramos esta rifa</h2><p>Revisa que el enlace esté completo.</p><button class="btn" onclick="location.href=location.pathname">Crear una rifa nueva</button>');
+        mostrarMensaje('<h2>No encontramos esta rifa</h2><p>Revisa que el enlace esté completo.</p><button class="btn" onclick="location.href=location.pathname">Ir al inicio</button>');
         return;
       }
       try { localStorage.setItem('rifa_ultima', JSON.stringify({ id: rid, titulo: data.info.titulo, v: tokV || '' })); } catch (e) {}
@@ -584,6 +599,7 @@
     }
     $('orgTag').textContent = isOrg ? 'Eres el organizador de esta rifa.' : 'Cartón de ' + (miVend ? miVend.nombre : '');
     $('orgTag').classList.toggle('hidden', !isOrg && !miVend);
+    $('btnNew').classList.toggle('hidden', !isOrg);
 
     $('cTaken').textContent = t;
     $('bar').style.width = (t * 100 / NUM()) + '%';
@@ -946,6 +962,19 @@
     }
   });
   $('btnNew').addEventListener('click', () => { location.href = location.pathname; });
+
+  async function entrarClave(crear) {
+    const c = $('lkPw').value;
+    if (c.length < 6) { $('lkMsg').textContent = 'La clave debe tener al menos 6 caracteres.'; return; }
+    try {
+      if (crear) await set(ref(db, 'config/clave'), c);
+      await set(ref(db, 'autorizados/' + uid), c);
+      $('lock').classList.add('hidden'); $('setup').classList.remove('hidden'); $('lkPw').value = '';
+    } catch (e) { $('lkMsg').textContent = crear ? 'Ya existe una clave. Escríbela y toca Entrar.' : 'Clave incorrecta.'; }
+  }
+  $('lkIn').onclick = () => entrarClave(false);
+  $('lkNew').onclick = () => entrarClave(true);
+  $('lkPw').addEventListener('keydown', (e) => { if (e.key === 'Enter') entrarClave(false); });
 
   boot();
 </script>
