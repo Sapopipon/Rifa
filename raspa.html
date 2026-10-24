@@ -34,12 +34,28 @@
   .row:last-child { border:0; }
   .row .acts { display:flex; gap:6px; flex-wrap:wrap; }
   .small { font-size:12px; color:var(--mu); margin-top:8px; }
+  .demo { background:#C8102E; color:#fff; text-align:center; padding:8px; border-radius:10px; margin-bottom:10px; font-weight:700; font-size:13px; }
+  .frame { border-radius:18px; padding:12px; background:linear-gradient(160deg,#0F4C45,#2a0f4a); border:4px solid #F2B134; box-shadow:0 0 0 2px #C8102E; margin-bottom:14px; }
+  .marquee { text-align:center; font-weight:900; font-size:22px; color:#F2B134; letter-spacing:.04em; margin-bottom:8px; text-shadow:0 2px 0 #7a1a1a; }
+  .frame .ticket { height:auto; aspect-ratio:1; border-radius:14px; }
+  .grid { position:absolute; inset:0; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); gap:6px; padding:6px; background:#1b1140; }
+  .fig { display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:10px; background:radial-gradient(circle,#3a2a7a,#1b1140); color:#fff; }
+  .fig .e { font-size:clamp(28px,11vw,50px); line-height:1.1; }
+  .fig small { font-size:11px; font-weight:800; color:#F2B134; min-height:13px; }
+  .fig.gana { animation:pulso .7s infinite alternate; box-shadow:0 0 0 3px #F2B134; }
+  @keyframes pulso { to { transform:scale(1.08); } }
+  .badge { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:34%; aspect-ratio:1; border-radius:50%; background:#C8102E; color:#fff; display:grid; place-content:center; text-align:center; font-weight:900; border:3px dashed #F2B134; pointer-events:none; font-size:15px; line-height:1.1; }
+  .badge small { font-size:10px; }
+  .rule { text-align:center; color:#fff; font-weight:700; margin:10px 0 6px; font-size:14px; }
+  .pay { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; font-size:12px; color:#fff; }
+  .pay span { background:rgba(255,255,255,.14); padding:3px 8px; border-radius:99px; }
   .toast { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:#1d1d1f; color:#fff; padding:11px 16px; border-radius:12px; opacity:0; pointer-events:none; transition:opacity .25s; max-width:92vw; text-align:center; }
   .toast.show { opacity:1; }
 </style>
 </head>
 <body>
 <main>
+  <div id="demoBar" class="demo hidden">🎪 DEMO · datos de ejemplo, no se mueve plata real</div>
   <h1 id="title">🎟️ Raspa y Gana</h1>
   <p class="sub" id="sub"></p>
 
@@ -54,13 +70,17 @@
     <label>% de ingresos destinado a premios (máx. 90)</label><input id="cPct" type="number" min="1" max="90" value="60">
     <label>Premios <small>(múltiplos del precio, separados por coma)</small></label><input id="cPr" value="1,2,5,10,50">
     <button class="full" id="btnCreate">Crear juego</button>
+    <p class="small"><a href="?demo=1">Probar una demo</a> para ver cómo juega tu cliente, sin guardar nada.</p>
     <p class="small">Cada boleto que vendas suma al fondo de premios el porcentaje que elijas. Un premio solo sale si el fondo alcanza para pagarlo.</p>
   </section>
 
   <!-- Panel del organizador -->
   <section id="admin" class="hidden">
     <div class="card"><button class="full" id="btnSell" style="margin-top:0">Vender boleto</button>
-      <p class="small">Cada venta crea un boleto con su resultado ya sorteado y abre el menú para enviar el enlace al comprador.</p></div>
+      <p class="small">Cada venta crea un boleto con su resultado ya sorteado y abre el menú para enviar el enlace al comprador.</p>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="sec" id="btnT0" style="flex:1">Prueba: sin premio</button><button class="sec" id="btnT1" style="flex:1">Prueba: con premio</button></div>
+      <p class="small">Los boletos de prueba no cuentan en ingresos, fondo ni ganancia.</p>
+      <button class="sec sm" id="btnTDel">Borrar boletos de prueba</button></div>
     <div class="card"><h2>Resumen</h2><div id="stats"></div></div>
     <div class="card"><h2>Premios por entregar</h2><div id="pend"></div></div>
     <div class="card"><h2>Configuración</h2>
@@ -73,13 +93,24 @@
   </section>
 
   <!-- Boleto del jugador -->
-  <section id="play" class="card hidden">
-    <div class="ticket" id="ticket">
-      <div class="cells" id="cells"><div>?</div><div>?</div><div>?</div></div>
-      <canvas id="cv"></canvas>
+  <section id="play" class="hidden">
+    <div class="frame">
+      <div class="marquee" id="ptitle">Raspa y Gana</div>
+      <div class="ticket" id="ticket">
+        <div class="grid" id="grid"></div>
+        <canvas id="cv"></canvas>
+        <div class="badge" id="badge">RASPÁ<small>CON EL DEDO</small></div>
+      </div>
+      <p class="rule">¡Encontrá 3 figuras iguales y ganá!</p>
+      <div class="pay" id="pay"></div>
     </div>
-    <div id="msg"></div>
-    <p class="small" id="hint">Raspa con el dedo los 3 espacios. Si salen 3 montos iguales, ganas.</p>
+    <div class="card">
+      <div id="msg"></div>
+      <p class="small" id="hint"></p>
+      <button class="full" id="btnAll">Revelar todo</button>
+      <button class="sec full hidden" id="btnNext">Nuevo boleto (práctica)</button>
+      <button class="sec full" id="btnMute">🔊 Sonido</button>
+    </div>
   </section>
 </main>
 <div class="toast" id="toast"></div>
@@ -112,6 +143,7 @@
   async function compartir(url) { try { if (navigator.share) { await navigator.share({ url }); return; } await navigator.clipboard.writeText(url); aviso('Enlace copiado.'); } catch (e) {} }
 
   async function boot() {
+    if (P.get('demo')) return demo();
     try {
       const app = initializeApp(firebaseConfig);
       db = getDatabase(app);
@@ -186,6 +218,27 @@
   }
   $('btnSell').onclick = vender;
 
+  // Boleto de prueba: no toca el fondo ni los ingresos
+  async function prueba(gana) {
+    if (!estado) return;
+    const tiers = mults().map((m) => m * estado.precio);
+    const monto = gana && tiers.length ? tiers[randInt(tiers.length)] : 0;
+    const k = randId(12), up = {};
+    up['raspa/' + jid + '/cartas/' + k] = { ok: true, n: 0, prueba: true };
+    up['raspa/' + jid + '/resultados/' + k] = monto;
+    try { await update(ref(db), up); compartir(link(k)); } catch (e) { aviso('No se pudo crear la prueba.'); }
+  }
+  $('btnT0').onclick = () => prueba(false);
+  $('btnT1').onclick = () => prueba(true);
+  $('btnTDel').onclick = async () => {
+    const ks = Object.keys(cartas).filter((k) => cartas[k].prueba);
+    if (!ks.length) { aviso('No hay boletos de prueba.'); return; }
+    if (!confirm('¿Borrar ' + ks.length + ' boletos de prueba?')) return;
+    const up = {};
+    ks.forEach((k) => { up['raspa/' + jid + '/cartas/' + k] = null; up['raspa/' + jid + '/resultados/' + k] = null; });
+    try { await update(ref(db), up); aviso('Pruebas borradas.'); } catch (e) { aviso('No se pudo borrar.'); }
+  };
+
   $('btnSave').onclick = async () => {
     const precio = Math.max(1, Math.round(+$('aPrice').value) || estado.precio);
     const pct = Math.min(90, Math.max(1, +$('aPct').value || estado.pct));
@@ -206,67 +259,136 @@
       ['<b>Ganancia del dueño</b>', '<b>' + fmt(estado.rev - estado.paid) + '</b>'], ['Boletos vendidos / ganadores', estado.sold + ' / ' + estado.wins]]
       .map(([a, b]) => '<div class="row"><span>' + a + '</span><span>' + b + '</span></div>').join('');
     const ids = Object.keys(cartas).sort((a, b) => cartas[b].n - cartas[a].n);
-    const gan = ids.filter((k) => cartas[k].raspada && resultados[k] > 0 && !cartas[k].entregado);
+    const gan = ids.filter((k) => cartas[k].raspada && resultados[k] > 0 && !cartas[k].entregado && !cartas[k].prueba);
     const pe = $('pend'); pe.innerHTML = gan.length ? '' : '<p class="small">No hay premios pendientes de entregar.</p>';
     gan.forEach((k) => { const d = document.createElement('div'); d.className = 'row'; d.innerHTML = '<span>Boleto #' + cartas[k].n + ' · <b>' + fmt(resultados[k]) + '</b></span>'; d.appendChild(mk('Marcar entregado', () => marcar(k, 'entregado', true))); pe.appendChild(d); });
     const li = $('list'); li.innerHTML = ids.length ? '' : '<p class="small">Aún no has vendido boletos.</p>';
     ids.forEach((k) => {
       const c = cartas[k], d = document.createElement('div'); d.className = 'row';
       const est = c.raspada ? (resultados[k] > 0 ? 'ganó ' + fmt(resultados[k]) + (c.entregado ? ' (entregado)' : '') : 'raspado, sin premio') : 'sin raspar';
-      d.innerHTML = '<span>#' + c.n + ' · ' + est + '</span>';
+      d.innerHTML = '<span>' + (c.prueba ? 'PRUEBA' : '#' + c.n) + ' · ' + est + '</span>';
       d.appendChild(mk('Copiar enlace', () => compartir(link(k)))); li.appendChild(d);
     });
   }
 
   /* ---------- jugador ---------- */
+  const FIG = ['🌿', '🍀', '🧉', '🌽', '🌺', '🦜', '⚽', '🎸', '💎'];
+  let AC = null, mudo = false, ultimo = 0;
+  const audio = () => { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); return AC; };
+  function nota(f, t, d, tipo, v) {
+    const ac = audio(), o = ac.createOscillator(), g = ac.createGain();
+    o.type = tipo; o.frequency.value = f;
+    g.gain.setValueAtTime(v, ac.currentTime + t); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + t + d);
+    o.connect(g); g.connect(ac.destination); o.start(ac.currentTime + t); o.stop(ac.currentTime + t + d);
+  }
+  function sonRaspa() {
+    const n = Date.now(); if (mudo || n - ultimo < 70) return; ultimo = n;
+    try {
+      const ac = audio(), b = ac.createBuffer(1, ac.sampleRate * .06, ac.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) * .3;
+      const src = ac.createBufferSource(), f = ac.createBiquadFilter();
+      f.type = 'highpass'; f.frequency.value = 1800; src.buffer = b; src.connect(f); f.connect(ac.destination); src.start();
+    } catch (e) {}
+  }
+  function sonFin(gano) {
+    if (mudo) return;
+    try { if (gano) [523, 659, 784, 1047, 1319].forEach((f, i) => nota(f, i * .12, .3, 'triangle', .18)); else { nota(330, 0, .25, 'sine', .12); nota(247, .22, .35, 'sine', .12); } } catch (e) {}
+  }
+  $('btnMute').onclick = () => { mudo = !mudo; $('btnMute').textContent = mudo ? '🔇 Sonido apagado' : '🔊 Sonido'; };
+
   const cv = $('cv'), ctx = cv.getContext('2d');
-  let revealed = false, started = false, monto = null;
+  let revealed = false, monto = null, carga = null, local = null, down = false, init = false;
+
   function cubrir() {
     const r = $('ticket').getBoundingClientRect(); cv.width = r.width; cv.height = r.height;
     ctx.globalCompositeOperation = 'source-over';
-    const g = ctx.createLinearGradient(0, 0, r.width, r.height); g.addColorStop(0, '#b8b8c0'); g.addColorStop(1, '#8e8e98');
+    const g = ctx.createLinearGradient(0, 0, r.width, r.height); g.addColorStop(0, '#c9c9d2'); g.addColorStop(1, '#8e8e98');
     ctx.fillStyle = g; ctx.fillRect(0, 0, r.width, r.height);
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 18px system-ui'; ctx.textAlign = 'center'; ctx.fillText('RASPA AQUÍ', r.width / 2, r.height / 2 + 6);
+    ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
+    for (let y = 24, k = 0; y < r.height; y += 34, k++) for (let x = k % 2 ? 40 : 90; x < r.width; x += 120) ctx.fillText('RASPÁ AQUÍ ★', x, y);
   }
-  function celdas(m) {
-    const cs = $('cells').children, pr = (info.premios || []).map(fmt);
-    if (m > 0) { for (const c of cs) c.textContent = fmt(m); return; }
-    const pool = pr.length > 1 ? pr : [fmt(1000), fmt(2000), fmt(5000)], a = [0, 1, 2].map(() => pool[randInt(pool.length)]);
-    if (a[0] === a[1] && a[1] === a[2]) a[2] = pool[(pool.indexOf(a[2]) + 1) % pool.length];
-    a.forEach((t, i) => { cs[i].textContent = t; });
+  function mostrarPagos() { $('pay').innerHTML = (info.premios || []).slice(0, 9).map((a, i) => '<span>' + FIG[i] + ' ' + fmt(a) + '</span>').join(''); }
+  function reiniciar() {
+    revealed = false; monto = null; carga = null;
+    $('msg').textContent = ''; $('badge').classList.remove('hidden'); cv.classList.remove('hidden');
+    $('grid').innerHTML = '<div class="fig"><span class="e">?</span></div>'.repeat(9);
+    cubrir(); mostrarPagos();
+  }
+  // 9 figuras: si ganó, hay exactamente 3 iguales del premio; ninguna otra figura se repite más de 2 veces
+  function armar(m) {
+    const tiers = info.premios || [], ti = m > 0 ? tiers.indexOf(m) : -1, f0 = ti >= 0 ? ti % 9 : 0;
+    const cnt = Array(9).fill(0), cells = [];
+    if (m > 0) { for (let i = 0; i < 3; i++) cells.push({ f: f0, l: fmt(m), g: true }); cnt[f0] = 3; }
+    while (cells.length < 9) { const f = randInt(9); if (cnt[f] < 2) { cnt[f]++; cells.push({ f, l: tiers[f] ? fmt(tiers[f]) : '' }); } }
+    for (let i = 8; i > 0; i--) { const j = randInt(i + 1); [cells[i], cells[j]] = [cells[j], cells[i]]; }
+    $('grid').innerHTML = cells.map((c) => '<div class="fig' + (c.g ? ' g' : '') + '"><span class="e">' + FIG[c.f] + '</span><small>' + c.l + '</small></div>').join('');
   }
   function resultado(m, entregado) {
     $('msg').innerHTML = m > 0 ? '<span class="win">¡Ganaste ' + fmt(m) + '! 🎉</span>' : 'Sin premio esta vez.';
-    $('hint').textContent = m > 0 ? (entregado ? 'Premio ya entregado.' : 'Muestra este boleto al organizador para cobrar tu premio.') : 'Gracias por jugar.';
+    $('hint').textContent = m > 0 ? (entregado ? 'Premio ya entregado.' : (local ? '' : 'Muestra este boleto al organizador para cobrar tu premio.')) : 'Gracias por jugar.';
   }
-  function revelar() { if (revealed) return; revealed = true; ctx.clearRect(0, 0, cv.width, cv.height); resultado(monto || 0, false); }
+  function revelar() {
+    if (revealed || monto === null) return; revealed = true;
+    ctx.clearRect(0, 0, cv.width, cv.height); cv.classList.add('hidden');
+    document.querySelectorAll('.fig.g').forEach((x) => x.classList.add('gana'));
+    resultado(monto, false); sonFin(monto > 0);
+  }
   function limpio() { const d = ctx.getImageData(0, 0, cv.width, cv.height).data; let c = 0, n = 0; for (let i = 3; i < d.length; i += 16) { n++; if (d[i] === 0) c++; } if (c / n > 0.55) revelar(); }
-  function raspar(e) { if (revealed) return; const r = cv.getBoundingClientRect(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(e.clientX - r.left, e.clientY - r.top, 16, 0, 7); ctx.fill(); }
-  async function empezar() {
-    if (started) return; started = true;
-    try { await set(ref(db, 'raspa/' + jid + '/cartas/' + cid + '/raspada'), true); } catch (e) {}
-    try { const s = await get(ref(db, 'raspa/' + jid + '/resultados/' + cid)); monto = s.val(); celdas(monto || 0); }
-    catch (e) { aviso('No se pudo leer tu boleto. Intenta de nuevo.'); started = false; }
+  function raspar(e) { if (revealed) return; const r = cv.getBoundingClientRect(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(e.clientX - r.left, e.clientY - r.top, 18, 0, 7); ctx.fill(); sonRaspa(); }
+
+  function empezar() {
+    if (carga) return carga;
+    $('badge').classList.add('hidden');
+    carga = (async () => {
+      if (local) { monto = local.monto; armar(monto); return; }
+      try { await set(ref(db, 'raspa/' + jid + '/cartas/' + cid + '/raspada'), true); } catch (e) {}
+      try { const s = await get(ref(db, 'raspa/' + jid + '/resultados/' + cid)); monto = s.val() || 0; armar(monto); }
+      catch (e) { aviso('No se pudo leer tu boleto. Intenta de nuevo.'); carga = null; }
+    })();
+    return carga;
   }
-  let down = false, init = false;
+  cv.addEventListener('pointerdown', (e) => { down = true; cv.setPointerCapture(e.pointerId); empezar(); raspar(e); });
+  cv.addEventListener('pointermove', (e) => { if (down) raspar(e); });
+  cv.addEventListener('pointerup', () => { down = false; if (monto !== null) limpio(); });
+  $('btnAll').onclick = async () => { await empezar(); revelar(); };
+
   function jugador() {
     $('create').classList.add('hidden'); $('admin').classList.add('hidden'); $('msgBox').classList.add('hidden'); $('play').classList.remove('hidden');
     if (init) return; init = true;
-    if (info.pct) $('hint').textContent += ' El ' + info.pct + '% de lo recaudado se reparte en premios.';
+    $('ptitle').textContent = info.titulo;
+    if (info.pct) $('hint').textContent = 'El ' + info.pct + '% de lo recaudado se reparte en premios.';
+    reiniciar();
     onValue(ref(db, 'raspa/' + jid + '/cartas/' + cid), async (s) => {
       const c = s.val();
       if (!c) { mensaje('<h2>Boleto no válido</h2><p>Revisa que el enlace esté completo.</p>'); return; }
-      $('sub').textContent = 'Boleto #' + c.n;
-      if (c.raspada && !started && !revealed) {
-        revealed = true; ctx.clearRect(0, 0, cv.width, cv.height); cv.classList.add('hidden');
-        try { const r = await get(ref(db, 'raspa/' + jid + '/resultados/' + cid)); monto = r.val() || 0; celdas(monto); resultado(monto, !!c.entregado); }
+      $('sub').textContent = c.prueba ? 'Boleto de prueba' : 'Boleto #' + c.n;
+      if (c.raspada && !carga && !revealed) {
+        revealed = true; carga = Promise.resolve(); $('badge').classList.add('hidden'); cv.classList.add('hidden');
+        try { const r = await get(ref(db, 'raspa/' + jid + '/resultados/' + cid)); monto = r.val() || 0; armar(monto); document.querySelectorAll('.fig.g').forEach((x) => x.classList.add('gana')); resultado(monto, !!c.entregado); }
         catch (e) { $('msg').textContent = 'Este boleto ya fue raspado.'; }
       } else if (revealed && monto > 0) resultado(monto, !!c.entregado);
     });
-    cubrir();
-    cv.addEventListener('pointerdown', (e) => { down = true; cv.setPointerCapture(e.pointerId); empezar(); raspar(e); });
-    cv.addEventListener('pointermove', (e) => { if (down) raspar(e); });
-    cv.addEventListener('pointerup', () => { down = false; if (started) limpio(); });
+  }
+
+  // Modo práctica: sin Firebase, no guarda nada
+  function demo() {
+    info = { titulo: 'Raspa y Gana', pct: 60, premios: [1, 2, 5, 10, 50].map((m) => m * 5000) };
+    $('demoBar').classList.remove('hidden'); $('create').classList.add('hidden'); $('play').classList.remove('hidden');
+    $('btnNext').classList.remove('hidden'); $('ptitle').textContent = info.titulo; $('hint').textContent = 'Es una práctica: nada se guarda ni se paga.';
+    let pool = 0, n = 0;
+    const nuevo = () => {
+      pool += 3000; n++;
+      const opts = info.premios.filter((a) => a <= pool);
+      let win = 0;
+      if (opts.length && rnd() < Math.min(0.5, pool / 40000)) {
+        const w = opts.map((_, i) => 1 / Math.pow(2, i));
+        let r = rnd() * w.reduce((a, b) => a + b, 0), i = 0;
+        while (i < w.length - 1 && r > w[i]) { r -= w[i]; i++; }
+        win = opts[i]; pool -= win;
+      }
+      local = { monto: win }; $('sub').textContent = 'Boleto de práctica #' + n; reiniciar();
+    };
+    $('btnNext').onclick = nuevo; nuevo();
   }
 
   boot();
