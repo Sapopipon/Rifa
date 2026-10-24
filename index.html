@@ -370,16 +370,21 @@
     <div>
       <div class="dlg-num display" id="dNum"></div>
       <p id="dInfo" class="empty"></p>
+      <p id="dWaInfo" class="empty hidden"></p>
     </div>
     <div id="dNameBox">
       <label><span id="dLbl">Tu nombre</span>
         <input type="text" id="dName" list="names" maxlength="30" autocomplete="off" placeholder="Ej.: María">
+      </label>
+      <label style="margin-top:10px"><span id="dWaLbl">WhatsApp</span>
+        <input type="tel" id="dWa" inputmode="tel" maxlength="20" autocomplete="off" placeholder="Ej.: 0981 123 456">
       </label>
       <datalist id="names"></datalist>
     </div>
     <label id="dPaidBox" class="hidden" style="grid-auto-flow:column;justify-content:start;align-items:center"><input type="checkbox" id="dPaid"> Ya pagó</label>
     <div class="dlg-actions">
       <button type="submit" class="btn" id="dOk" value="ok">Reservar número</button>
+      <button type="button" class="btn hidden" id="dWaBtn">Abrir WhatsApp</button>
       <button type="button" class="btn hidden" id="dPay"></button>
       <button type="button" class="btn danger hidden" id="dFree">Liberar número</button>
       <button type="button" class="btn ghost" id="dCancel">Cerrar</button>
@@ -441,6 +446,8 @@
     $('msg').innerHTML = html;
   }
   const money = (n) => n.toLocaleString('es');
+  // Acepta 0981123456, +595 981 123 456, etc. y devuelve solo dígitos con código de país (Paraguay 595)
+  const normWa = (raw) => { let d = String(raw).replace(/\D/g, ''); if (d.startsWith('0')) d = '595' + d.slice(1); return /^\d{9,15}$/.test(d) ? d : ''; };
   const NUM = () => (data && data.info && data.info.n) || 100;
   // Firebase devuelve arreglos cuando las claves son 1..100: lo normalizamos a objeto
   const norm = (o) => { const r = {}; if (!o) return r; (Array.isArray(o) ? o.map((v, i) => [i, v]) : Object.entries(o)).forEach(([k, v]) => { if (v != null) r[k] = v; }); return r; };
@@ -645,6 +652,15 @@
     b.querySelector('.proof').textContent = verifiedOk
       ? 'Verificado: este número coincide con el sello guardado cuando se creó la rifa.'
       : 'Atención: este número no coincide con el sello original de la rifa.';
+    if (data.info.org === uid && owner) {
+      const bw = document.createElement('button');
+      bw.className = 'btn'; bw.textContent = 'Escribirle por WhatsApp';
+      bw.onclick = async () => {
+        try { const sn = await get(ref(db, 'contactos/' + rid + '/' + ganador.numero)); const w = sn.val(); if (w) window.open('https://wa.me/' + w, '_blank'); else aviso('Este ganador no dejó WhatsApp.'); }
+        catch (e) { aviso('No se pudo leer el WhatsApp.'); }
+      };
+      b.appendChild(bw);
+    }
     b.classList.remove('hidden');
   }
 
@@ -681,7 +697,7 @@
     current = n;
     const rec = data.numeros[n], carton = data.cartones[n], gestiona = esGestor(n);
     $('dNum').textContent = 'Número ' + n;
-    ['dNameBox', 'dPaidBox', 'dOk', 'dPay', 'dFree'].forEach((x) => $(x).classList.add('hidden'));
+    ['dNameBox', 'dPaidBox', 'dOk', 'dPay', 'dFree', 'dWaBtn', 'dWaInfo'].forEach((x) => $(x).classList.add('hidden'));
     $('dLbl').textContent = gestiona ? 'Nombre del comprador' : 'Tu nombre';
     if (rec) {
       $('dInfo').textContent = 'Lo tiene ' + rec.nombre + (gestiona ? (rec.pagado === true ? ' (pagado).' : ' (sin pagar).') : '.');
@@ -689,6 +705,14 @@
         $('dPay').textContent = rec.pagado === true ? 'Marcar sin pagar' : 'Marcar como pagado';
         $('dPay').classList.remove('hidden');
         $('dFree').classList.remove('hidden');
+        $('dWaInfo').textContent = 'Cargando WhatsApp…'; $('dWaInfo').classList.remove('hidden');
+        const nn = n;
+        get(ref(db, 'contactos/' + rid + '/' + nn)).then((sn) => {
+          if (current !== nn) return;
+          const w = sn.val();
+          if (w) { $('dWaInfo').textContent = 'WhatsApp: +' + w; $('dWaBtn').onclick = () => window.open('https://wa.me/' + w, '_blank'); $('dWaBtn').classList.remove('hidden'); }
+          else $('dWaInfo').textContent = 'Sin WhatsApp registrado.';
+        }).catch(() => $('dWaInfo').classList.add('hidden'));
       }
     } else if (carton && !gestiona) {
       $('dInfo').textContent = 'Reservado: ' + carton + '.';
@@ -699,10 +723,11 @@
       $('dNameBox').classList.remove('hidden');
       $('dOk').classList.remove('hidden');
       $('dOk').textContent = gestiona ? 'Asignar número' : 'Reservar número';
-      let saved = '';
+      let saved = '', savedWa = '';
       if (gestiona) { $('dPaidBox').classList.remove('hidden'); $('dPaid').checked = false; }
-      else { try { saved = localStorage.getItem('rifa_nombre') || ''; } catch (e) {} }
-      $('dName').value = saved;
+      else { try { saved = localStorage.getItem('rifa_nombre') || ''; savedWa = localStorage.getItem('rifa_wa') || ''; } catch (e) {} }
+      $('dName').value = saved; $('dWa').value = savedWa;
+      $('dWaLbl').textContent = gestiona ? 'WhatsApp del comprador (opcional)' : 'Tu WhatsApp (solo lo ve el organizador)';
     }
     $('dlg').showModal();
     if (!rec && !$('dNameBox').classList.contains('hidden')) $('dName').focus();
@@ -713,10 +738,15 @@
     const nombre = $('dName').value.trim();
     if (!nombre) { $('dName').focus(); return; }
     const n = current, gestiona = esGestor(n);
+    const waRaw = $('dWa').value.trim(), wa = normWa(waRaw);
+    if ((!gestiona && !wa) || (waRaw && !wa)) { aviso('Escribe un número de WhatsApp válido.'); $('dWa').focus(); return; }
     $('dOk').disabled = true;
     try {
-      await set(ref(db, 'rifas/' + rid + '/numeros/' + n), { nombre, pagado: gestiona && $('dPaid').checked });
-      if (!gestiona) { try { localStorage.setItem('rifa_nombre', nombre); } catch (e2) {} }
+      const up = {};
+      up['rifas/' + rid + '/numeros/' + n] = { nombre, pagado: gestiona && $('dPaid').checked };
+      if (wa) up['contactos/' + rid + '/' + n] = wa;
+      await update(ref(db), up);
+      if (!gestiona) { try { localStorage.setItem('rifa_nombre', nombre); localStorage.setItem('rifa_wa', wa); } catch (e2) {} }
       $('dlg').close();
       aviso('Número ' + n + ' reservado para ' + nombre + '.');
     } catch (err) {
@@ -734,7 +764,7 @@
   });
 
   $('dFree').addEventListener('click', async () => {
-    try { await remove(ref(db, 'rifas/' + rid + '/numeros/' + current)); aviso('Número ' + current + ' liberado.'); }
+    try { await update(ref(db), { ['rifas/' + rid + '/numeros/' + current]: null, ['contactos/' + rid + '/' + current]: null }); aviso('Número ' + current + ' liberado.'); }
     catch (e) { aviso('No se pudo liberar el número.'); }
     $('dlg').close();
   });
