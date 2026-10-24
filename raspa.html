@@ -81,6 +81,10 @@
       <div style="display:flex;gap:8px;margin-top:10px"><button class="sec" id="btnT0" style="flex:1">Prueba: sin premio</button><button class="sec" id="btnT1" style="flex:1">Prueba: con premio</button></div>
       <p class="small">Los boletos de prueba no cuentan en ingresos, fondo ni ganancia.</p>
       <button class="sec sm" id="btnTDel">Borrar boletos de prueba</button></div>
+    <div class="card hidden" id="ultCard"><h2>Último boleto creado</h2>
+      <input id="ultLink" readonly onclick="this.select()">
+      <div style="display:flex;gap:8px;margin-top:8px"><button class="sec" id="ultCopy" style="flex:1">Copiar enlace</button><button id="ultOpen" style="flex:1">Abrir aquí</button></div>
+      <p class="small">Para probar como comprador, copia el enlace y pégalo en una pestaña de incógnito.</p></div>
     <div class="card"><h2>Resumen</h2><div id="stats"></div></div>
     <div class="card"><h2>Premios por entregar</h2><div id="pend"></div></div>
     <div class="card"><h2>Configuración</h2>
@@ -140,7 +144,11 @@
   let tt; const aviso = (m) => { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 3000); };
   const mensaje = (h) => { ['create', 'admin', 'play'].forEach((x) => $(x).classList.add('hidden')); $('msgBox').classList.remove('hidden'); $('msgBox').innerHTML = h; };
   const link = (k) => location.origin + location.pathname + '?j=' + jid + '&c=' + k;
-  async function compartir(url) { try { if (navigator.share) { await navigator.share({ url }); return; } await navigator.clipboard.writeText(url); aviso('Enlace copiado.'); } catch (e) {} }
+  async function compartir(url) {
+    try { if (navigator.share) { await navigator.share({ url }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(url); aviso('Enlace copiado.'); }
+    catch (e) { prompt('Copia este enlace:', url); }
+  }
 
   async function boot() {
     if (P.get('demo')) return demo();
@@ -162,7 +170,7 @@
       if (info.org !== uid) { mensaje('<h2>Pide tu boleto</h2><p>Este enlace no es de un boleto. Pídele el tuyo al organizador.</p>'); return; }
       try { localStorage.setItem('raspa_ultimo', JSON.stringify({ id: jid, titulo: info.titulo })); } catch (e) {}
       if (!window._adm) { window._adm = true; admin(); }
-    });
+    }, (err) => mensaje('<h2>No se pudo abrir el juego</h2><p>' + (err.code || err.message) + '</p>'));
   }
 
   /* ---------- crear ---------- */
@@ -192,6 +200,10 @@
   }
   const mk = (txt, fn, cls) => { const b = document.createElement('button'); b.className = 'sm ' + (cls || 'sec'); b.textContent = txt; b.onclick = fn; return b; };
   const mults = () => Object.values((estado && estado.premios) || {});
+  function mostrarUlt(url) {
+    $('ultCard').classList.remove('hidden'); $('ultLink').value = url;
+    $('ultCopy').onclick = () => compartir(url); $('ultOpen').onclick = () => window.open(url, '_blank');
+  }
 
   // El resultado se sortea aquí, al vender, y queda guardado donde solo el organizador lo lee
   async function vender() {
@@ -212,7 +224,7 @@
     up['raspa/' + jid + '/cartas/' + k] = { ok: true, n: e.sold };
     up['raspa/' + jid + '/resultados/' + k] = win;
     $('btnSell').disabled = true;
-    try { await update(ref(db), up); compartir(link(k)); }
+    try { await update(ref(db), up); mostrarUlt(link(k)); compartir(link(k)); }
     catch (err) { aviso('No se pudo crear el boleto.'); }
     $('btnSell').disabled = false;
   }
@@ -226,7 +238,7 @@
     const k = randId(12), up = {};
     up['raspa/' + jid + '/cartas/' + k] = { ok: true, n: 0, prueba: true };
     up['raspa/' + jid + '/resultados/' + k] = monto;
-    try { await update(ref(db), up); compartir(link(k)); } catch (e) { aviso('No se pudo crear la prueba.'); }
+    try { await update(ref(db), up); mostrarUlt(link(k)); compartir(link(k)); } catch (e) { aviso('No se pudo crear la prueba.'); }
   }
   $('btnT0').onclick = () => prueba(false);
   $('btnT1').onclick = () => prueba(true);
@@ -367,7 +379,7 @@
         try { const r = await get(ref(db, 'raspa/' + jid + '/resultados/' + cid)); monto = r.val() || 0; armar(monto); document.querySelectorAll('.fig.g').forEach((x) => x.classList.add('gana')); resultado(monto, !!c.entregado); }
         catch (e) { $('msg').textContent = 'Este boleto ya fue raspado.'; }
       } else if (revealed && monto > 0) resultado(monto, !!c.entregado);
-    });
+    }, (err) => mensaje('<h2>No se pudo abrir el boleto</h2><p>' + (err.code || err.message) + '</p>'));
   }
 
   // Modo práctica: sin Firebase, no guarda nada
