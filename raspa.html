@@ -75,6 +75,17 @@
 
   <div id="msgBox" class="card hidden"></div>
 
+  <!-- Acceso del organizador -->
+  <section id="lock" class="card hidden">
+    <h2>Acceso del organizador</h2>
+    <p class="small">Solo quien tenga la clave puede crear juegos. Si eres jugador, usa el enlace de tu boleto.</p>
+    <label>Clave</label><input type="password" id="lkPw" maxlength="40" autocomplete="current-password">
+    <button class="full" id="lkIn" type="button">Entrar</button>
+    <button class="sec full" id="lkNew" type="button">Crear la clave por primera vez</button>
+    <p class="small" id="lkMsg"></p>
+    <p class="small"><a href="?demo=1">Probar una demostración</a></p>
+  </section>
+
   <!-- Crear juego -->
   <section id="create" class="card hidden">
     <button class="sec full hidden" id="btnLast" style="margin-top:0"></button>
@@ -101,6 +112,10 @@
       <input id="ultLink" readonly onclick="this.select()">
       <div style="display:flex;gap:8px;margin-top:8px"><button class="sec" id="ultCopy" style="flex:1">Copiar enlace</button><button id="ultOpen" style="flex:1">Abrir aquí</button></div>
       <p class="small">Para probar como comprador, copia el enlace y pégalo en una pestaña de incógnito.</p></div>
+    <div class="card"><h2>Enlace de prueba para publicar</h2>
+      <input id="demoLink" readonly onclick="this.select()">
+      <div style="display:flex;gap:8px;margin-top:8px"><button class="sec" id="demoCopy" style="flex:1">Copiar enlace</button><button class="sec" id="demoOpen" style="flex:1">Abrir</button></div>
+      <p class="small">Cualquiera que lo abra prueba el juego con boletos de práctica, sin gastar jugadas ni mover plata. Al que quiera comprar, le generas su boleto con Vender boleto.</p></div>
     <div class="card"><h2>Resumen</h2><div id="stats"></div></div>
     <div class="card"><h2>Premios por entregar</h2><div id="pend"></div></div>
     <div class="card"><h2>Configuración</h2>
@@ -174,14 +189,17 @@
   }
 
   async function boot() {
-    if (P.get('demo')) return demo();
+    if (P.get('demo') && !jid) return demo();
     try {
       const app = initializeApp(firebaseConfig);
       db = getDatabase(app);
       uid = (await signInAnonymously(getAuth(app))).user.uid;
     } catch (e) { mensaje('<h2>No se pudo conectar</h2><p>' + (e.code || e.message) + '</p>'); return; }
+    if (P.get('demo')) { let b = null; try { b = (await get(ref(db, 'raspa/' + jid + '/info'))).val(); } catch (e) {} return demo(b); }
     if (!jid) {
-      $('create').classList.remove('hidden');
+      let ok = false;
+      try { ok = (await get(ref(db, 'autorizados/' + uid))).exists(); } catch (e) {}
+      $(ok ? 'create' : 'lock').classList.remove('hidden');
       try { const u = JSON.parse(localStorage.getItem('raspa_ultimo') || 'null'); if (u) { $('btnLast').textContent = 'Volver a: ' + u.titulo; $('btnLast').classList.remove('hidden'); $('btnLast').onclick = () => { location.search = '?j=' + u.id; }; } } catch (e) {}
       return;
     }
@@ -220,6 +238,8 @@
   function admin() {
     $('create').classList.add('hidden'); $('msgBox').classList.add('hidden'); $('admin').classList.remove('hidden');
     $('sub').textContent = 'Panel del organizador';
+    const du = location.origin + location.pathname + '?demo=1&j=' + jid;
+    $('demoLink').value = du; $('demoCopy').onclick = () => compartir(du); $('demoOpen').onclick = () => window.open(du, '_blank');
     onValue(ref(db, 'raspa/' + jid + '/estado'), (s) => { estado = s.val(); pintar(); });
     onValue(ref(db, 'raspa/' + jid + '/cartas'), (s) => { cartas = s.val() || {}; pintar(); });
     onValue(ref(db, 'raspa/' + jid + '/resultados'), (s) => { resultados = s.val() || {}; pintar(); });
@@ -481,16 +501,24 @@
   }
 
   // Modo práctica: sin Firebase, no guarda nada
-  function demo() {
-    info = { titulo: 'Raspa y Gana', pct: 60, premios: [1, 2, 5, 10, 50].map((m) => m * 5000) };
+  function demo(base) {
+    const precio = (base && base.precio) || 5000, pct = (base && base.pct) || 60;
+    info = base && base.premios ? { ...base } : { titulo: 'Raspa y Gana', premios: [1, 2, 5, 10, 50].map((m) => m * 5000) };
+    info.precio = precio; info.pct = pct;
+    info.premios = Object.values(info.premios);
     $('demoBar').classList.remove('hidden'); $('create').classList.add('hidden'); $('play').classList.remove('hidden');
     $('btnNext').classList.remove('hidden'); $('ptitle').textContent = info.titulo; $('hint').textContent = 'Es una práctica: nada se guarda ni se paga.';
+    if (info.wa) {
+      $('buyCard').classList.remove('hidden');
+      $('buyTxt').textContent = 'Si te gustó, escríbele al organizador por WhatsApp para comprar jugadas (' + fmt(precio) + ' cada una). Él te genera tu propio boleto.';
+      $('btnBuy').onclick = () => window.open('https://wa.me/' + info.wa + '?text=' + encodeURIComponent('Hola, probé la demo de ' + info.titulo + ' y quiero comprar jugadas.'), '_blank');
+    }
     let pool = 0, n = 0;
     const nuevo = () => {
-      pool += 3000; n++;
+      pool += precio * pct / 100; n++;
       const opts = info.premios.filter((a) => a <= pool);
       let win = 0;
-      if (opts.length && rnd() < Math.min(0.5, pool / 40000)) {
+      if (opts.length && rnd() < Math.min(0.5, pool / (precio * 8))) {
         const w = opts.map((_, i) => 1 / Math.pow(2, i));
         let r = rnd() * w.reduce((a, b) => a + b, 0), i = 0;
         while (i < w.length - 1 && r > w[i]) { r -= w[i]; i++; }
@@ -500,6 +528,19 @@
     };
     $('btnNext').onclick = nuevo; nuevo();
   }
+
+  async function entrarClave(crear) {
+    const c = $('lkPw').value;
+    if (c.length < 6) { $('lkMsg').textContent = 'La clave debe tener al menos 6 caracteres.'; return; }
+    try {
+      if (crear) await set(ref(db, 'config/clave'), c);
+      await set(ref(db, 'autorizados/' + uid), c);
+      $('lock').classList.add('hidden'); $('create').classList.remove('hidden'); $('lkPw').value = '';
+    } catch (e) { $('lkMsg').textContent = crear ? 'Ya existe una clave. Escríbela y toca Entrar.' : 'Clave incorrecta.'; }
+  }
+  $('lkIn').onclick = () => entrarClave(false);
+  $('lkNew').onclick = () => entrarClave(true);
+  $('lkPw').addEventListener('keydown', (e) => { if (e.key === 'Enter') entrarClave(false); });
 
   boot();
 </script>

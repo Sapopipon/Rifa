@@ -278,6 +278,14 @@
 </head>
 <body>
 <div class="wrap">
+  <div id="demoBar" class="hidden" style="background:#E8506A;color:#fff;border-radius:12px;padding:10px 12px;margin-top:14px;font-size:.9rem">
+    🎪 <b>DEMO</b> · datos de ejemplo, nada se guarda.
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn" id="dmRole" type="button" style="min-height:36px;padding:6px 12px;font-size:.85rem;background:#fff"></button>
+      <button class="btn" id="dmFill" type="button" style="min-height:36px;padding:6px 12px;font-size:.85rem;background:#fff">Completar el tablero</button>
+      <button class="btn" id="dmReset" type="button" style="min-height:36px;padding:6px 12px;font-size:.85rem;background:#fff">Reiniciar demo</button>
+    </div>
+  </div>
 
   <!-- Mensajes de estado (config, errores, rifa no encontrada) -->
   <section id="msg" class="panel-msg hidden"></section>
@@ -294,6 +302,7 @@
     <button class="btn" id="lkIn" type="button">Entrar</button>
     <button class="btn ghost" id="lkNew" type="button">Crear la clave por primera vez</button>
     <p class="prize" id="lkMsg"></p>
+    <p class="prize"><a href="?demo=1">Ver una demostración de la rifa</a></p>
   </section>
 
   <!-- Crear rifa -->
@@ -314,6 +323,10 @@
       <input type="number" id="inPrice" min="0" step="any" placeholder="Ej.: 5">
     </label>
     <button class="btn" id="btnStart">Sellar el sobre y crear la rifa</button>
+    <hr style="border:0;border-top:1px solid var(--line);width:100%">
+    <p class="prize">¿Quieres mostrar cómo funciona? La demo es una rifa de ejemplo que no guarda nada, y cualquiera puede probarla.</p>
+    <a class="btn ghost" href="?demo=org" style="text-align:center;text-decoration:none">Probar la demo (como organizador)</a>
+    <button class="btn ghost" id="btnDemoLink" type="button">Compartir el enlace de la demo</button>
   </section>
 
   <!-- Juego -->
@@ -408,7 +421,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getDatabase, ref, onValue, set, get, remove, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getDatabase, ref as _ref, onValue as _onValue, set as _set, get as _get, remove as _remove, update as _update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
   /* ============================================================
      PEGA AQUÍ LA CONFIGURACIÓN DE TU PROYECTO DE FIREBASE
@@ -425,7 +438,25 @@
   };
 
   const $ = (id) => document.getElementById(id);
-  const rid = new URLSearchParams(location.search).get('r');
+  const DEMO = new URLSearchParams(location.search).get('demo');
+  const rid = DEMO ? 'demo' : new URLSearchParams(location.search).get('r');
+
+  // Modo demo: una base de datos simulada en memoria, no toca Firebase
+  const fake = { tree: {}, subs: [] };
+  const gp = (p) => p.split('/').filter(Boolean).reduce((o, k) => (o == null ? undefined : o[k]), fake.tree);
+  const sp = (p, v) => {
+    const ks = p.split('/').filter(Boolean); let o = fake.tree;
+    ks.slice(0, -1).forEach((k) => { if (typeof o[k] !== 'object' || o[k] === null) o[k] = {}; o = o[k]; });
+    if (v == null) delete o[ks[ks.length - 1]]; else o[ks[ks.length - 1]] = v;
+  };
+  const snap = (p) => { const v = gp(p); return { val: () => (v === undefined ? null : JSON.parse(JSON.stringify(v))), exists: () => v != null }; };
+  const notify = () => fake.subs.forEach((x) => x.cb(snap(x.path)));
+  const ref = (d, p) => (DEMO ? { path: p || '' } : _ref(d, p));
+  const onValue = (r, cb, er) => { if (!DEMO) return _onValue(r, cb, er); fake.subs.push({ path: r.path, cb }); cb(snap(r.path)); };
+  const set = async (r, v) => { if (!DEMO) return _set(r, v); sp(r.path, v); notify(); };
+  const remove = (r) => set(r, null);
+  const get = async (r) => (DEMO ? snap(r.path) : _get(r));
+  const update = async (r, up) => { if (!DEMO) return _update(r, up); Object.entries(up).forEach(([k, v]) => sp(k, v)); notify(); };
   let db, uid, data = null, current = null;
   let miVend = null, vendedores = {}, paquetes = {}, subV = false;
   const tokV = new URLSearchParams(location.search).get('v');
@@ -471,7 +502,8 @@
       mostrarMensaje('<h2>Falta conectar la base de datos</h2><p>Abre <code>index.html</code> con un editor de texto y pega la configuración de tu proyecto de Firebase donde dice <code>PEGA_AQUI</code>.</p>');
       return;
     }
-    try {
+    if (DEMO) await iniciarDemo();
+    else try {
       const app = initializeApp(firebaseConfig);
       db = getDatabase(app);
       const cred = await signInAnonymously(getAuth(app));
@@ -517,7 +549,7 @@
         mostrarMensaje('<h2>No encontramos esta rifa</h2><p>Revisa que el enlace esté completo.</p><button class="btn" onclick="location.href=location.pathname">Ir al inicio</button>');
         return;
       }
-      try { localStorage.setItem('rifa_ultima', JSON.stringify({ id: rid, titulo: data.info.titulo, v: tokV || '' })); } catch (e) {}
+      if (!DEMO) try { localStorage.setItem('rifa_ultima', JSON.stringify({ id: rid, titulo: data.info.titulo, v: tokV || '' })); } catch (e) {}
       if (data.info.org === uid && !subV) {
         subV = true;
         onValue(ref(db, 'vendedores/' + rid), (sv) => {
@@ -950,7 +982,7 @@
 
   /* ---------- compartir y otras acciones ---------- */
   $('btnShare').addEventListener('click', async () => {
-    const url = location.origin + location.pathname + '?r=' + rid;
+    const url = location.origin + location.pathname + (DEMO ? '?demo=1' : '?r=' + rid);
     const title = data && data.info ? data.info.titulo : 'Rifa';
     try {
       if (navigator.share) { await navigator.share({ title, text: 'Elige tu número en la rifa', url }); return; }
@@ -962,6 +994,35 @@
     }
   });
   $('btnNew').addEventListener('click', () => { location.href = location.pathname; });
+
+  async function iniciarDemo() {
+    uid = DEMO === 'org' ? 'demo-org' : 'demo-user';
+    const N = 50, sec = 1 + Math.floor(Math.random() * N), nm = ['María', 'Juan', 'Ana', 'Luis', 'Sofía', 'Carlos', 'Lucía', 'Pedro', 'Elena', 'Diego'];
+    const numeros = {}, cupos = {}, cartones = {};
+    [3, 7, 12, 18, 22, 25, 31, 36, 40, 44, 47].forEach((n, i) => { numeros[n] = { nombre: nm[i % nm.length], pagado: i % 3 !== 1 }; });
+    for (let n = 21; n <= 30; n++) { cupos[n] = true; cartones[n] = 'Ricardo'; }
+    fake.tree = {
+      rifas: { demo: { info: { titulo: 'Rifa de demostración', premio: 'Canasta navideña (demo)', precio: 5000, sello: await sha256(sec + ':demo'), org: 'demo-org', n: N }, numeros, cartones } },
+      vendedores: { demo: { tokdemo: { nombre: 'Ricardo', cupos } } },
+      paquetes: { demo: { p1: { nombre: 'Cartón 1', nums: cupos, vend: 'tokdemo' } } },
+      contactos: { demo: { 3: '595981000111', 7: '595982000222' } },
+      privado: { demo: { secreto: sec, sal: 'demo' } }
+    };
+    $('demoBar').classList.remove('hidden');
+    $('dmRole').textContent = DEMO === 'org' ? 'Ver como participante' : 'Ver como organizador';
+    $('dmRole').onclick = () => { location.search = '?demo=' + (DEMO === 'org' ? '1' : 'org'); };
+    $('dmReset').onclick = () => location.reload();
+    $('dmFill').onclick = async () => {
+      const up = {};
+      for (let n = 1; n <= N; n++) if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: 'Invitado ' + n, pagado: n % 2 === 0 };
+      await update(ref(db), up);
+    };
+  }
+  $('btnDemoLink').onclick = async () => {
+    const url = location.origin + location.pathname + '?demo=1';
+    try { if (navigator.share) { await navigator.share({ url }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(url); aviso('Enlace copiado.'); } catch (e) { prompt('Copia este enlace:', url); }
+  };
 
   async function entrarClave(crear) {
     const c = $('lkPw').value;
