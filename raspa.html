@@ -413,7 +413,7 @@
     ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
     for (let y = 24, k = 0; y < r.height; y += 34, k++) for (let x = k % 2 ? 40 : 90; x < r.width; x += 120) ctx.fillText('RASPÁ AQUÍ ★', x, y);
   }
-  function mostrarPagos() { $('pay').innerHTML = (info.premios || []).slice(0, NF).map((a, i) => '<span><img src="' + SPR[i] + '" alt=""><b>' + fmt(a) + '</b></span>').join(''); }
+  function mostrarPagos() { $('pay').innerHTML = Object.values(info.premios || {}).slice(0, NF).map((a, i) => '<span><img src="' + SPR[i] + '" alt=""><b>' + fmt(a) + '</b></span>').join(''); }
   function reiniciar() {
     revealed = false; monto = null; carga = null;
     $('btnAll').classList.remove('hidden'); $('btnNextPlay').classList.add('hidden');
@@ -423,7 +423,7 @@
   }
   // 9 figuras: si ganó, hay exactamente 3 iguales del premio; ninguna otra figura se repite más de 2 veces
   function armar(m) {
-    const tiers = info.premios || [], ti = m > 0 ? tiers.indexOf(m) : -1, f0 = ti >= 0 ? ti % NF : 0;
+    const tiers = Object.values(info.premios || {}), ti = m > 0 ? tiers.indexOf(m) : -1, f0 = ti >= 0 ? ti % NF : 0;
     const cnt = Array(NF).fill(0), cells = [];
     if (m > 0) { for (let i = 0; i < 3; i++) cells.push({ f: f0, l: fmt(m), g: true }); cnt[f0] = 3; }
     while (cells.length < 9) { const f = randInt(NF); if (cnt[f] < 2) { cnt[f]++; cells.push({ f, l: tiers[f] ? fmt(tiers[f]) : '' }); } }
@@ -440,23 +440,36 @@
     document.querySelectorAll('.fig.g').forEach((x) => x.classList.add('gana'));
     resultado(monto, false); sonFin(monto > 0); if (!local) ui();
   }
-  function limpio() { const d = ctx.getImageData(0, 0, cv.width, cv.height).data; let c = 0, n = 0; for (let i = 3; i < d.length; i += 16) { n++; if (d[i] === 0) c++; } if (c / n > 0.55) revelar(); }
-  function raspar(e) { if (revealed) return; const r = cv.getBoundingClientRect(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(e.clientX - r.left, e.clientY - r.top, 18, 0, 7); ctx.fill(); sonRaspa(); }
+  function limpio() { const d = ctx.getImageData(0, 0, cv.width, cv.height).data; let c = 0, n = 0; for (let i = 3; i < d.length; i += 16) { n++; if (d[i] === 0) c++; } if (c / n > 0.45) revelar(); }
+  let trazos = 0;
+  function raspar(e) {
+    if (revealed) return;
+    const r = cv.getBoundingClientRect(), k = r.width ? cv.width / r.width : 1;
+    ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath();
+    ctx.arc((e.clientX - r.left) * k, (e.clientY - r.top) * k, 18 * k, 0, 7); ctx.fill(); sonRaspa();
+    if (++trazos % 8 === 0 && monto !== null) limpio();
+  }
 
   function empezar() {
     if (carga) return carga;
     $('badge').classList.add('hidden');
     carga = (async () => {
       if (local) { monto = local.monto; armar(monto); return; }
-      try { await set(ref(db, 'raspa/' + jid + '/cartas/' + cid + '/raspadas/' + cur), true); } catch (e) {}
-      try { const s = await get(ref(db, 'raspa/' + jid + '/resultados/' + cid + '/' + cur)); monto = s.val() || 0; armar(monto); }
-      catch (e) { aviso('No se pudo leer tu boleto. Intenta de nuevo.'); carga = null; }
+      let falla = null;
+      try { await set(ref(db, 'raspa/' + jid + '/cartas/' + cid + '/raspadas/' + cur), true); } catch (e) { falla = e; }
+      try { const s = await get(ref(db, 'raspa/' + jid + '/resultados/' + cid + '/' + cur)); if (s.val() === null) throw new Error('boleto sin resultado'); monto = s.val(); }
+      catch (e) { falla = falla || e; }
+      if (monto === null) {
+        $('msg').textContent = 'No se pudo leer tu boleto (' + ((falla && (falla.code || falla.message)) || 'error') + '). Avisa al organizador.';
+        $('badge').classList.remove('hidden'); carga = null; return;
+      }
+      armar(monto); limpio();
     })();
     return carga;
   }
   cv.addEventListener('pointerdown', (e) => { down = true; cv.setPointerCapture(e.pointerId); empezar(); raspar(e); });
   cv.addEventListener('pointermove', (e) => { if (down) raspar(e); });
-  cv.addEventListener('pointerup', () => { down = false; if (monto !== null) limpio(); });
+  ['pointerup', 'pointercancel'].forEach((t) => cv.addEventListener(t, () => { down = false; if (monto !== null) limpio(); }));
   $('btnAll').onclick = async () => { await empezar(); revelar(); };
 
   function ui() {
