@@ -46,6 +46,7 @@
   @keyframes pulso { to { transform:scale(1.08); } }
   .badge { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:34%; aspect-ratio:1; border-radius:50%; background:#C8102E; color:#fff; display:grid; place-content:center; text-align:center; font-weight:900; border:3px dashed #F2B134; pointer-events:none; font-size:15px; line-height:1.1; }
   .badge small { font-size:10px; }
+  #btnRev { pointer-events:auto; cursor:pointer; padding:0; font-size:15px; }
   .rule { text-align:center; color:#fff; font-weight:700; margin:10px 0 6px; font-size:14px; }
   .pay { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; font-size:12px; color:#fff; }
   .pay span { background:rgba(255,255,255,.14); padding:3px 8px; border-radius:99px; }
@@ -138,6 +139,7 @@
         <div class="grid" id="grid"></div>
         <canvas id="cv"></canvas>
         <div class="badge" id="badge">RASPÁ<small>CON EL DEDO</small></div>
+        <button class="badge hidden" id="btnRev" type="button">REVELAR</button>
       </div>
     </div>
     <div class="payBar"><b>PREMIOS</b><div class="pay" id="pay"></div></div>
@@ -412,12 +414,14 @@
     ctx.fillStyle = g; ctx.fillRect(0, 0, r.width, r.height);
     ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
     for (let y = 24, k = 0; y < r.height; y += 34, k++) for (let x = k % 2 ? 40 : 90; x < r.width; x += 120) ctx.fillText('RASPÁ AQUÍ ★', x, y);
+    CW = Math.ceil(r.width / 20); CH = Math.ceil(r.height / 20); celdas = new Uint8Array(CW * CH); marcadas = 0;
   }
   function mostrarPagos() { $('pay').innerHTML = Object.values(info.premios || {}).slice(0, NF).map((a, i) => '<span><img src="' + SPR[i] + '" alt=""><b>' + fmt(a) + '</b></span>').join(''); }
   function reiniciar() {
     revealed = false; monto = null; carga = null;
     $('btnAll').classList.remove('hidden'); $('btnNextPlay').classList.add('hidden');
-    $('msg').textContent = ''; $('badge').classList.remove('hidden'); cv.classList.remove('hidden');
+    $('msg').textContent = ''; $('badge').classList.remove('hidden'); cv.classList.remove('hidden'); $('btnRev').classList.add('hidden');
+    $('hint').textContent = local ? 'Es una práctica: nada se guarda ni se paga.' : (info.pct ? 'El ' + info.pct + '% de lo recaudado se reparte en premios.' : '');
     $('grid').innerHTML = '<div class="fig"><span class="e">?</span></div>'.repeat(9);
     cubrir(); mostrarPagos();
   }
@@ -436,23 +440,32 @@
   }
   function revelar() {
     if (revealed || monto === null) return; revealed = true;
-    ctx.clearRect(0, 0, cv.width, cv.height); cv.classList.add('hidden');
+    ctx.clearRect(0, 0, cv.width, cv.height); cv.classList.add('hidden'); $('btnRev').classList.add('hidden');
     document.querySelectorAll('.fig.g').forEach((x) => x.classList.add('gana'));
     resultado(monto, false); sonFin(monto > 0); if (!local) ui();
   }
-  function limpio() { const d = ctx.getImageData(0, 0, cv.width, cv.height).data; let c = 0, n = 0; for (let i = 3; i < d.length; i += 16) { n++; if (d[i] === 0) c++; } if (c / n > 0.45) revelar(); }
+  let celdas = null, marcadas = 0, CW = 0, CH = 0;
+  function marcar(x, y) {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const cx = Math.floor(x / 20) + dx, cy = Math.floor(y / 20) + dy;
+      if (cx < 0 || cy < 0 || cx >= CW || cy >= CH || celdas[cy * CW + cx]) continue;
+      if (Math.hypot(x - (cx + .5) * 20, y - (cy + .5) * 20) <= 18) { celdas[cy * CW + cx] = 1; marcadas++; }
+    }
+  }
+  function limpio() { if (celdas && CW && marcadas / (CW * CH) > 0.5) revelar(); }
   let trazos = 0;
   function raspar(e) {
     if (revealed) return;
     const r = cv.getBoundingClientRect(), k = r.width ? cv.width / r.width : 1;
     ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath();
-    ctx.arc((e.clientX - r.left) * k, (e.clientY - r.top) * k, 18 * k, 0, 7); ctx.fill(); sonRaspa();
-    if (++trazos % 8 === 0 && monto !== null) limpio();
+    const x = (e.clientX - r.left) * k, y = (e.clientY - r.top) * k;
+    ctx.arc(x, y, 18 * k, 0, 7); ctx.fill(); marcar(x, y); sonRaspa();
+    if (monto !== null) limpio();
   }
 
   function empezar() {
     if (carga) return carga;
-    $('badge').classList.add('hidden');
+    $('badge').classList.add('hidden'); $('btnRev').classList.remove('hidden');
     carga = (async () => {
       if (local) { monto = local.monto; armar(monto); return; }
       let falla = null;
@@ -461,7 +474,7 @@
       catch (e) { falla = falla || e; }
       if (monto === null) {
         $('msg').textContent = 'No se pudo leer tu boleto (' + ((falla && (falla.code || falla.message)) || 'error') + '). Avisa al organizador.';
-        $('badge').classList.remove('hidden'); carga = null; return;
+        $('badge').classList.remove('hidden'); $('btnRev').classList.add('hidden'); carga = null; return;
       }
       armar(monto); limpio();
     })();
@@ -471,6 +484,7 @@
   cv.addEventListener('pointermove', (e) => { if (down) raspar(e); });
   ['pointerup', 'pointercancel'].forEach((t) => cv.addEventListener(t, () => { down = false; if (monto !== null) limpio(); }));
   $('btnAll').onclick = async () => { await empezar(); revelar(); };
+  $('btnRev').onclick = $('btnAll').onclick;
 
   function ui() {
     const rest = total - usadas;
