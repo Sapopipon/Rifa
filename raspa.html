@@ -445,7 +445,7 @@
     resultado(monto, false); sonFin(monto > 0); if (!local) ui();
   }
   let celdas = null, marcadas = 0, CW = 0, CH = 0;
-  function marcar(x, y) {
+  function marcarZona(x, y) {
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       const cx = Math.floor(x / 20) + dx, cy = Math.floor(y / 20) + dy;
       if (cx < 0 || cy < 0 || cx >= CW || cy >= CH || celdas[cy * CW + cx]) continue;
@@ -459,7 +459,7 @@
     const r = cv.getBoundingClientRect(), k = r.width ? cv.width / r.width : 1;
     ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath();
     const x = (e.clientX - r.left) * k, y = (e.clientY - r.top) * k;
-    ctx.arc(x, y, 18 * k, 0, 7); ctx.fill(); marcar(x, y); sonRaspa();
+    ctx.arc(x, y, 18 * k, 0, 7); ctx.fill(); marcarZona(x, y); sonRaspa();
     if (monto !== null) limpio();
   }
 
