@@ -367,6 +367,12 @@
 
     <div class="board" id="board" role="group" aria-label="Tablero de números"></div>
 
+    <div id="soloBox" class="hidden" style="margin-top:16px;display:grid;gap:8px">
+      <button class="btn" id="soloOpen" type="button">🎉 Ver cómo será cuando salga el premio</button>
+      <button class="btn ghost hidden" id="soloReset" type="button">Volver a empezar la demo</button>
+      <p class="prize" style="text-align:center">Es una simulación: se completa el tablero y se abre el sobre. No se guarda nada.</p>
+    </div>
+
     <div class="people hidden" id="revBox">
       <h2>Cartones</h2>
       <div id="pqList"></div>
@@ -1022,12 +1028,20 @@
     $('dmRole').onclick = () => { location.search = '?demo=' + (DEMO === 'org' ? '1' : 'org'); };
     $('dmReset').onclick = () => location.reload();
     $('dmHint').textContent = DEMO === 'org' ? 'Estás viendo la rifa como organizador.' : 'Toca un número para reservarlo, como lo hace un comprador. Al final, abre el sobre para ver el resultado.';
-    $('dmOpen').onclick = async () => {
+    const abrirDemo = async () => {
       const up = {};
       for (let n = 1; n <= N; n++) if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: 'Invitado ' + n, pagado: n % 2 === 0 };
       up['rifas/demo/ganador'] = { numero: sec, sal: 'demo' };
       await update(ref(db), up);
     };
+    $('dmOpen').onclick = abrirDemo;
+    if (SOLO) $('soloBox').classList.remove('hidden');
+    $('soloOpen').onclick = async () => {
+      await abrirDemo();
+      $('soloOpen').classList.add('hidden'); $('soloReset').classList.remove('hidden');
+      setTimeout(() => $('winnerBanner').scrollIntoView({ behavior: 'smooth', block: 'center' }), 1300);
+    };
+    $('soloReset').onclick = () => location.reload();
     $('dmFill').onclick = async () => {
       const up = {};
       for (let n = 1; n <= N; n++) if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: 'Invitado ' + n, pagado: n % 2 === 0 };
