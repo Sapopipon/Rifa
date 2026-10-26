@@ -280,9 +280,11 @@
 <div class="wrap">
   <div id="demoBar" class="hidden" style="background:#E8506A;color:#fff;border-radius:12px;padding:10px 12px;margin-top:14px;font-size:.9rem">
     🎪 <b>DEMO</b> · datos de ejemplo, nada se guarda.
+    <div id="dmHint" style="margin-top:4px"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
       <button class="btn" id="dmRole" type="button" style="min-height:36px;padding:6px 12px;font-size:.85rem;background:#fff"></button>
       <button class="btn" id="dmFill" type="button" style="min-height:36px;padding:6px 12px;font-size:.85rem;background:#fff">Completar el tablero</button>
+      <button class="btn" id="dmOpen" type="button" style="min-height:36px;padding:6px 12px;font-size:.85rem;background:#fff">Abrir el sobre (simulación)</button>
       <button class="btn" id="dmReset" type="button" style="min-height:36px;padding:6px 12px;font-size:.85rem;background:#fff">Reiniciar demo</button>
     </div>
   </div>
@@ -324,8 +326,9 @@
     </label>
     <button class="btn" id="btnStart">Sellar el sobre y crear la rifa</button>
     <hr style="border:0;border-top:1px solid var(--line);width:100%">
-    <p class="prize">¿Quieres mostrar cómo funciona? La demo es una rifa de ejemplo que no guarda nada, y cualquiera puede probarla.</p>
-    <a class="btn ghost" href="?demo=org" style="text-align:center;text-decoration:none">Probar la demo (como organizador)</a>
+    <p class="prize">¿Quieres mostrar cómo funciona? La demo es una rifa de ejemplo que se usa como la usa un comprador de números. No guarda nada, y cualquiera puede probarla.</p>
+    <a class="btn ghost" href="?demo=1" style="text-align:center;text-decoration:none">Probar la demo (como comprador)</a>
+    <p class="prize"><a href="?demo=org">Ver la demo como organizador</a></p>
     <button class="btn ghost" id="btnDemoLink" type="button">Compartir el enlace de la demo</button>
   </section>
 
@@ -1012,6 +1015,13 @@
     $('dmRole').textContent = DEMO === 'org' ? 'Ver como participante' : 'Ver como organizador';
     $('dmRole').onclick = () => { location.search = '?demo=' + (DEMO === 'org' ? '1' : 'org'); };
     $('dmReset').onclick = () => location.reload();
+    $('dmHint').textContent = DEMO === 'org' ? 'Estás viendo la rifa como organizador.' : 'Toca un número para reservarlo, como lo hace un comprador. Al final, abre el sobre para ver el resultado.';
+    $('dmOpen').onclick = async () => {
+      const up = {};
+      for (let n = 1; n <= N; n++) if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: 'Invitado ' + n, pagado: n % 2 === 0 };
+      up['rifas/demo/ganador'] = { numero: sec, sal: 'demo' };
+      await update(ref(db), up);
+    };
     $('dmFill').onclick = async () => {
       const up = {};
       for (let n = 1; n <= N; n++) if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: 'Invitado ' + n, pagado: n % 2 === 0 };
