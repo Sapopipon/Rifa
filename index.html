@@ -8,8 +8,12 @@
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Rifa 100">
-<title>Rifa de los 100 números</title>
+<meta name="apple-mobile-web-app-title" content="Rifa">
+<title>Rifa en línea</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="Rifa en línea · Elige tu número">
+<meta property="og:description" content="Entra, elige tu número y participa.">
+<meta property="og:image" content="https://sapopipon.github.io/Rifa/icon-512.png">
 <style>
   :root {
     --page: #E8EEEF;
@@ -310,13 +314,13 @@
 
   <!-- Crear rifa -->
   <section id="setup" class="setup hidden">
-    <h1>Rifa de los 100 números</h1>
-    <p class="prize">Se guarda un número secreto en un sobre sellado. Cada persona elige su número desde su celular y, cuando se vendan los 100, el organizador abre el sobre: gana quien tenga ese número.</p>
+    <h1>Crear una rifa</h1>
+    <p class="prize">Se guarda un número secreto en un sobre sellado. Cada persona elige su número desde su celular y, cuando se vendan todos los números, el organizador abre el sobre: gana quien tenga ese número.</p>
     <label>Nombre de la rifa
       <input type="text" id="inTitle" value="Gran rifa" maxlength="40">
     </label>
-    <label>Cantidad de números <small>Elige 50, 100 o escribe la cantidad (de 2 a 500).</small>
-      <input type="number" id="inN" min="2" max="500" value="100">
+    <label>Cantidad de números <small>Elige 50, 100 o escribe la cantidad (de 2 a 300).</small>
+      <input type="number" id="inN" min="2" max="300" value="100">
       <span style="display:flex;gap:8px"><button type="button" class="btn ghost" onclick="document.getElementById('inN').value=50">50</button><button type="button" class="btn ghost" onclick="document.getElementById('inN').value=100">100</button></span>
     </label>
     <label>Premio
@@ -359,7 +363,7 @@
         <div class="seal">?</div>
       </div>
       <div class="progress-info">
-        <div class="count display"><span id="cTaken">0</span> <small id="cOf">de 100 vendidos</small></div>
+        <div class="count display"><span id="cTaken">0</span> <small id="cOf">vendidos</small></div>
         <div class="bar"><i id="bar"></i></div>
         <p class="status-line" id="statusLine"></p>
         <button class="btn hidden" id="btnOpen">Abrir el sobre</button>
@@ -373,7 +377,7 @@
     <div id="soloBox" class="hidden" style="margin-top:16px;display:grid;gap:8px">
       <button class="btn" id="soloOpen" type="button">🎉 Ver cómo será cuando salga el premio</button>
       <button class="btn ghost hidden" id="soloReset" type="button">Volver a empezar la demo</button>
-      <p class="prize" style="text-align:center">Es una simulación: se completa el tablero y se abre el sobre. No se guarda nada.</p>
+      <p class="prize" style="text-align:center">Es una simulación: se habilitan todos los números y el ganador se revela automáticamente. No se guarda nada.</p>
     </div>
 
     <div class="people hidden" id="revBox">
@@ -383,6 +387,14 @@
           <input type="tel" id="ctWa" inputmode="tel" maxlength="20" placeholder="Ej.: 0981 123 456">
         </label>
         <button class="btn" id="ctSave" type="button">Guardar contacto</button>
+      </div>
+      <h2>Generar cartón para un revendedor</h2>
+      <div class="setup" style="margin-bottom:14px">
+        <label>Nombre del revendedor<input type="text" id="gvNombre" maxlength="30"></label>
+        <label>WhatsApp del revendedor <small>Opcional</small><input type="tel" id="gvWa" inputmode="tel" maxlength="20" placeholder="Ej.: 0981 123 456"></label>
+        <label>Números de su cartón <small>Ej.: 1-10, 25, 40-45</small><input type="text" id="gvNums"></label>
+        <button class="btn" id="gvCrear" type="button">Generar cartón y contraseña</button>
+        <div id="gvOut" class="hidden"></div>
       </div>
       <h2>Cartones</h2>
       <div id="pqList"></div>
@@ -398,7 +410,15 @@
     <div class="people hidden" id="cartonBox">
       <h2>Mi cartón</h2>
       <div id="cartonList"></div>
-      <p class="empty">Contorno rojo = número sin pagar.</p>
+      <p class="empty">Contorno rojo = número pendiente de habilitar.</p>
+      <div class="setup" style="margin-top:8px">
+        <label>Tu WhatsApp (para tus compradores)
+          <input type="tel" id="mvWa" inputmode="tel" maxlength="20" placeholder="Ej.: 0981 123 456">
+        </label>
+        <button class="btn" id="mvSave" type="button">Guardar mi contacto</button>
+        <button class="btn ghost" id="mvShare" type="button">Compartir mi enlace para vender</button>
+        <button class="btn ghost" id="revSalir" type="button">Salir del acceso de revendedor</button>
+      </div>
     </div>
 
     <div class="people">
@@ -410,6 +430,16 @@
       <h2>¿Dudas o quieres más números?</h2>
       <p class="prize">Escríbele directamente al organizador por WhatsApp.</p>
       <button class="btn" id="btnContacto" type="button">Escribir por WhatsApp</button>
+    </section>
+
+    <p class="prize" id="revLink" style="text-align:center;margin-top:14px"><a href="#" id="lnkRev">Acceso de revendedores</a></p>
+    <section id="revLogin" class="setup hidden">
+      <h2>Acceso de revendedores</h2>
+      <label>Contraseña
+        <input type="text" id="rlPw" autocomplete="off" autocapitalize="characters" placeholder="Ej.: ABCDE-FGHJK">
+      </label>
+      <button class="btn" id="rlIn" type="button">Entrar</button>
+      <p class="prize" id="rlMsg"></p>
     </section>
 
     <div class="footer-actions">
@@ -436,7 +466,7 @@
       </label>
       <datalist id="names"></datalist>
     </div>
-    <label id="dPaidBox" class="hidden" style="grid-auto-flow:column;justify-content:start;align-items:center"><input type="checkbox" id="dPaid"> Ya pagó</label>
+    <label id="dPaidBox" class="hidden" style="grid-auto-flow:column;justify-content:start;align-items:center"><input type="checkbox" id="dPaid"> Habilitar ahora (ya pagó)</label>
     <div class="dlg-actions">
       <button type="submit" class="btn" id="dOk" value="ok">Reservar número</button>
       <button type="button" class="btn hidden" id="dWaBtn">Abrir WhatsApp</button>
@@ -488,8 +518,10 @@
   const get = async (r) => (DEMO ? snap(r.path) : _get(r));
   const update = async (r, up) => { if (!DEMO) return _update(r, up); Object.entries(up).forEach(([k, v]) => sp(k, v)); notify(); };
   let db, uid, data = null, current = null;
-  let miVend = null, vendedores = {}, paquetes = {}, subV = false;
-  const tokV = new URLSearchParams(location.search).get('v');
+  let miVend = null, vendedores = {}, paquetes = {}, subV = false, autoRev = false;
+  let tokV = new URLSearchParams(location.search).get('v') || '';
+  try { if (!tokV && !DEMO) tokV = localStorage.getItem('rev_' + rid) || ''; } catch (e) {}
+  tokV = tokV || null;
   let verifiedKey = null, verifiedOk = null;
 
   /* ---------- utilidades ---------- */
@@ -564,14 +596,14 @@
         if (miVend) {
           miVend.cupos = norm(miVend.cupos);
           set(ref(db, 'revs/' + rid + '/' + uid), tokV).catch(() => {});
-        } else aviso('El enlace de revendedor no es válido o fue eliminado.');
+        } else { try { localStorage.removeItem('rev_' + rid); } catch (e) {} aviso('El acceso de revendedor no es válido o fue eliminado.'); }
         if (data) render();
       });
     }
     onValue(ref(db, 'rifas/' + rid), (snap) => {
       data = snap.val();
       if (data) {
-        data.numeros = norm(data.numeros); data.cartones = norm(data.cartones);
+        data.numeros = norm(data.numeros); data.cartones = norm(data.cartones); data.habilitados = norm(data.habilitados);
         const NN = (data.info && data.info.n) || 100;
         ['numeros', 'cartones'].forEach((f) => Object.keys(data[f]).forEach((k) => { if (+k > NN) delete data[f][k]; }));
       }
@@ -607,7 +639,7 @@
       const titulo = $('inTitle').value.trim() || 'Rifa';
       const premio = $('inPrize').value.trim();
       const precio = parseFloat($('inPrice').value) || 0;
-      const n = Math.min(500, Math.max(2, Math.round(+$('inN').value) || 100));
+      const n = Math.min(300, Math.max(2, Math.round(+$('inN').value) || 100));
       const waRaw = $('inWa').value.trim(), wa = normWa(waRaw);
       if (waRaw && !wa) { btn.disabled = false; aviso('El WhatsApp no parece válido.'); return; }
       const secreto = randN(n);
@@ -619,6 +651,8 @@
       if (premio) info.premio = premio;
       await set(ref(db, 'rifas/' + id + '/info'), info);
       await set(ref(db, 'privado/' + id), { secreto, sal });
+      const rel = {}; for (let k = n + 1; k <= 300; k++) rel['rifas/' + id + '/habilitados/' + k] = true;
+      if (n < 300) await update(ref(db), rel);
       location.search = '?r=' + id;
     } catch (e) {
       btn.disabled = false;
@@ -654,6 +688,8 @@
     const isOrg = info.org === uid;
     const t = Object.keys(numeros).length;
     const full = t === NUM();
+    const hab = Object.keys(data.habilitados || {}).filter((k) => +k >= 1 && +k <= NUM()).length;
+    if (!ganador && hab === NUM() && !autoRev) { autoRev = true; autoRevelar(); }
 
     $('gTitle').textContent = info.titulo;
     document.title = info.titulo;
@@ -665,9 +701,11 @@
     $('orgTag').textContent = isOrg ? 'Eres el organizador de esta rifa.' : 'Cartón de ' + (miVend ? miVend.nombre : '');
     $('orgTag').classList.toggle('hidden', !isOrg && !miVend);
     $('btnNew').classList.toggle('hidden', !isOrg);
-    const verContacto = !!info.wa && !isOrg;
+    const waC = normWa(new URLSearchParams(location.search).get('w') || '') || info.wa;
+    const verContacto = !!waC && !isOrg;
+    $('revLink').classList.toggle('hidden', isOrg || !!miVend || !!DEMO);
     $('contactoCard').classList.toggle('hidden', !verContacto);
-    if (verContacto) $('btnContacto').onclick = () => window.open('https://wa.me/' + info.wa + '?text=' + encodeURIComponent('Hola, quiero consultar sobre la rifa "' + info.titulo + '".'), '_blank');
+    if (verContacto) $('btnContacto').onclick = () => window.open('https://wa.me/' + waC + '?text=' + encodeURIComponent('Hola, quiero consultar sobre la rifa "' + info.titulo + '".'), '_blank');
 
     $('cTaken').textContent = t;
     $('bar').style.width = (t * 100 / NUM()) + '%';
@@ -784,9 +822,9 @@
     ['dNameBox', 'dPaidBox', 'dOk', 'dPay', 'dFree', 'dWaBtn', 'dWaInfo'].forEach((x) => $(x).classList.add('hidden'));
     $('dLbl').textContent = gestiona ? 'Nombre del comprador' : 'Tu nombre';
     if (rec) {
-      $('dInfo').textContent = 'Lo tiene ' + rec.nombre + (gestiona ? (rec.pagado === true ? ' (pagado).' : ' (sin pagar).') : '.');
+      $('dInfo').textContent = 'Lo tiene ' + rec.nombre + (gestiona ? (rec.pagado === true ? ' (habilitado).' : ' (pendiente de habilitar).') : '.');
       if (gestiona) {
-        $('dPay').textContent = rec.pagado === true ? 'Marcar sin pagar' : 'Marcar como pagado';
+        $('dPay').textContent = rec.pagado === true ? 'Deshabilitar número' : 'Habilitar número (ya pagó)';
         $('dPay').classList.remove('hidden');
         $('dFree').classList.remove('hidden');
         $('dWaInfo').textContent = 'Cargando WhatsApp…'; $('dWaInfo').classList.remove('hidden');
@@ -829,6 +867,7 @@
       const up = {};
       up['rifas/' + rid + '/numeros/' + n] = { nombre, pagado: gestiona && $('dPaid').checked };
       if (wa) up['contactos/' + rid + '/' + n] = wa;
+      if (gestiona && $('dPaid').checked) up['rifas/' + rid + '/habilitados/' + n] = true;
       await update(ref(db), up);
       if (!gestiona) { try { localStorage.setItem('rifa_nombre', nombre); localStorage.setItem('rifa_wa', wa); } catch (e2) {} }
       $('dlg').close();
@@ -841,14 +880,12 @@
   });
 
   $('dPay').addEventListener('click', async () => {
-    const r = data.numeros[current];
-    try { await set(ref(db, 'rifas/' + rid + '/numeros/' + current + '/pagado'), !(r && r.pagado === true)); }
-    catch (e) { aviso('No se pudo cambiar el estado de pago.'); }
+    await toggleHab(current);
     $('dlg').close();
   });
 
   $('dFree').addEventListener('click', async () => {
-    try { await update(ref(db), { ['rifas/' + rid + '/numeros/' + current]: null, ['contactos/' + rid + '/' + current]: null }); aviso('Número ' + current + ' liberado.'); }
+    try { await update(ref(db), { ['rifas/' + rid + '/numeros/' + current]: null, ['contactos/' + rid + '/' + current]: null, ['rifas/' + rid + '/habilitados/' + current]: null }); aviso('Número ' + current + ' liberado.'); }
     catch (e) { aviso('No se pudo liberar el número.'); }
     $('dlg').close();
   });
@@ -883,11 +920,11 @@
   async function entregar(pid, sel) {
     const q = paquetes[pid];
     if (!q) return;
-    let tok = sel, nomV = '';
+    let tok = sel, nomV = '', waV = '';
     if (sel === '__nuevo') {
       nomV = (prompt('Nombre del revendedor:') || '').trim();
       if (!nomV) { render(); return; }
-      tok = randId(20);
+      tok = randId(10); waV = normWa(prompt('WhatsApp del revendedor (opcional):') || '');
     } else if (sel) nomV = vendedores[sel].nombre;
     const ids = Object.keys(q.nums), up = {};
     if (q.vend && vendedores[q.vend]) ids.forEach((n) => { up['vendedores/' + rid + '/' + q.vend + '/cupos/' + n] = null; });
@@ -897,7 +934,8 @@
       if (sel === '__nuevo') {
         const cupos = {};
         libres.forEach((n) => { cupos[n] = true; });
-        up['vendedores/' + rid + '/' + tok] = libres.length ? { nombre: nomV, cupos } : { nombre: nomV };
+        const base = waV ? { nombre: nomV, wa: waV } : { nombre: nomV };
+        up['vendedores/' + rid + '/' + tok] = libres.length ? { ...base, cupos } : base;
       } else libres.forEach((n) => { up['vendedores/' + rid + '/' + tok + '/cupos/' + n] = true; });
     }
     up['paquetes/' + rid + '/' + pid + '/vend'] = sel ? tok : null;
@@ -937,6 +975,68 @@
     try { await update(ref(db), up); } catch (e) { aviso('No se pudo eliminar.'); }
   }
 
+  const fmtPass = (t) => t.toUpperCase().match(/.{1,5}/g).join('-');
+  const textoAcceso = (nombre, tok) => 'Acceso de revendedor · ' + data.info.titulo + '\nEnlace: ' + location.origin + location.pathname + '?r=' + rid + '\nContraseña: ' + fmtPass(tok) + '\n(En la rifa, toca "Acceso de revendedores" e ingresa la contraseña.)';
+  async function compartirTxt(texto) {
+    try { if (navigator.share) { await navigator.share({ text: texto }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(texto); aviso('Copiado.'); } catch (e) { prompt('Copia este texto:', texto); }
+  }
+  // Habilitar = confirmar el número (ya pagó). Cuando todos están habilitados, el ganador se revela solo.
+  async function toggleHab(k) {
+    const r = data.numeros[k], on = !(r && r.pagado === true), up = {};
+    up['rifas/' + rid + '/numeros/' + k + '/pagado'] = on;
+    up['rifas/' + rid + '/habilitados/' + k] = on ? true : null;
+    try { await update(ref(db), up); } catch (e) { aviso('No se pudo cambiar el estado del número.'); }
+  }
+  async function abrirWa(k) {
+    try { const sn = await get(ref(db, 'contactos/' + rid + '/' + k)); const w = sn.val(); if (w) window.open('https://wa.me/' + w, '_blank'); else aviso('Este comprador no dejó WhatsApp.'); }
+    catch (e) { aviso('No se pudo leer el WhatsApp.'); }
+  }
+  async function autoRevelar() {
+    try { const sn = await get(ref(db, 'privado/' + rid)); const pr = sn.val(); if (pr) await set(ref(db, 'rifas/' + rid + '/ganador'), { numero: pr.secreto, sal: pr.sal }); }
+    catch (e) { autoRev = false; }
+  }
+  $('gvCrear').onclick = async () => {
+    const nombre = $('gvNombre').value.trim(), raw = $('gvWa').value.trim(), wa = normWa(raw);
+    const nums = parseNums($('gvNums').value).filter((n) => !data.numeros[n] && !data.cartones[n]);
+    if (!nombre || !nums.length) { aviso('Escribe el nombre y al menos un número libre.'); return; }
+    if (raw && !wa) { aviso('El WhatsApp no parece válido.'); return; }
+    const tok = randId(10), pid = randId(8), cupos = {}, up = {};
+    nums.forEach((n) => { cupos[n] = true; up['rifas/' + rid + '/cartones/' + n] = nombre; });
+    up['vendedores/' + rid + '/' + tok] = wa ? { nombre, cupos, wa } : { nombre, cupos };
+    up['paquetes/' + rid + '/' + pid] = { nombre: 'Cartón de ' + nombre, nums: cupos, vend: tok };
+    try {
+      await update(ref(db), up);
+      const out = $('gvOut'); out.classList.remove('hidden'); out.innerHTML = '';
+      const pp = document.createElement('p'); pp.className = 'prize'; pp.innerHTML = 'Cartón de <b></b> con ' + nums.length + ' números. Contraseña: <b></b>';
+      const bs = pp.querySelectorAll('b'); bs[0].textContent = nombre; bs[1].textContent = fmtPass(tok);
+      out.append(pp, btn('Copiar acceso para enviarle', () => compartirTxt(textoAcceso(nombre, tok))));
+      $('gvNombre').value = ''; $('gvWa').value = ''; $('gvNums').value = '';
+    } catch (e) { aviso('No se pudo generar el cartón.'); }
+  };
+  $('mvSave').onclick = async () => {
+    const raw = $('mvWa').value.trim(), wa = normWa(raw);
+    if (raw && !wa) { aviso('El WhatsApp no parece válido.'); return; }
+    try { await update(ref(db), { ['vendedores/' + rid + '/' + tokV + '/wa']: wa || null }); aviso('Contacto guardado.'); } catch (e) { aviso('No se pudo guardar.'); }
+  };
+  $('mvShare').onclick = () => {
+    const wa = normWa($('mvWa').value);
+    if (!wa) { aviso('Primero guarda tu WhatsApp.'); return; }
+    compartirTxt('Rifa "' + data.info.titulo + '": elige tu número aquí:\n' + location.origin + location.pathname + '?r=' + rid + '&w=' + wa);
+  };
+  $('revSalir').onclick = () => { try { localStorage.removeItem('rev_' + rid); } catch (e) {} location.search = '?r=' + rid; };
+  $('lnkRev').onclick = (e) => { e.preventDefault(); $('revLogin').classList.toggle('hidden'); };
+  $('rlIn').onclick = async () => {
+    const tk = $('rlPw').value.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!tk) return;
+    try {
+      const sn = await get(ref(db, 'vendedores/' + rid + '/' + tk));
+      if (!sn.exists()) { $('rlMsg').textContent = 'Contraseña incorrecta.'; return; }
+      try { localStorage.setItem('rev_' + rid, tk); } catch (e) {}
+      location.search = '?r=' + rid;
+    } catch (e) { $('rlMsg').textContent = 'No se pudo verificar. Intenta de nuevo.'; }
+  };
+
   async function copiar(url) {
     try {
       if (navigator.share) { await navigator.share({ url }); return; }
@@ -959,6 +1059,7 @@
     $('revBox').classList.toggle('hidden', !isOrg);
     if (isOrg && !$('ctWa').dataset.listo) { $('ctWa').dataset.listo = '1'; $('ctWa').value = info.wa || ''; }
     $('cartonBox').classList.toggle('hidden', !miVend);
+    if (miVend && !$('mvWa').dataset.listo) { $('mvWa').dataset.listo = '1'; $('mvWa').value = miVend.wa || ''; }
     if (isOrg) {
       const pl = $('pqList');
       pl.innerHTML = '';
@@ -988,8 +1089,9 @@
         const sp = vs.filter((k) => numeros[k].pagado !== true).length;
         const nombres = Object.values(paquetes).filter((q) => q.vend === tok).map((q) => q.nombre).join(', ') || 'sin cartones';
         box.appendChild(fila(v.nombre + ' (' + vs.length + '/' + ids.length + ')',
-          nombres + ' · sin pagar: ' + sp + (info.precio ? ' (' + money(sp * info.precio) + ')' : ''),
-          btn('Copiar enlace', () => copiar(location.origin + location.pathname + '?r=' + rid + '&v=' + tok)),
+          nombres + ' · pendientes: ' + sp + (info.precio ? ' (' + money(sp * info.precio) + ')' : '') + (v.wa ? ' · WhatsApp +' + v.wa : ''),
+          btn('Copiar acceso', () => compartirTxt(textoAcceso(v.nombre, tok))),
+          btn('Enlace directo', () => copiar(location.origin + location.pathname + '?r=' + rid + '&v=' + tok)),
           btn('Eliminar', () => borrarVend(tok, v), 'danger')));
       });
     }
@@ -998,13 +1100,9 @@
       cl.innerHTML = '';
       Object.keys(miVend.cupos).sort((x, y) => x - y).forEach((k) => {
         const r = numeros[k];
-        const d = document.createElement('div');
-        d.className = 'person';
-        const t = document.createElement('b'); t.textContent = k;
-        const sm = document.createElement('span');
-        sm.textContent = r ? r.nombre + (r.pagado === true ? ' · pagó' : ' · sin pagar') : 'libre';
-        d.append(t, sm);
-        cl.appendChild(d);
+        const sm = r ? r.nombre + (r.pagado === true ? ' · habilitado' : ' · pendiente') : 'libre';
+        const extra = r ? [btn(r.pagado === true ? 'Deshabilitar' : 'Habilitar', () => toggleHab(k)), btn('WhatsApp', () => abrirWa(k))] : [];
+        cl.appendChild(fila(k, sm, ...extra));
       });
     }
   }
@@ -1026,11 +1124,14 @@
 
   /* ---------- compartir y otras acciones ---------- */
   $('btnShare').addEventListener('click', async () => {
-    const url = location.origin + location.pathname + (DEMO ? '?demo=1' + (SOLO ? '&solo=1' : '') : '?r=' + rid);
+    const waq = new URLSearchParams(location.search).get('wa');
+    const url = location.origin + location.pathname + (DEMO ? '?demo=1' + (SOLO ? '&solo=1' : '') + (waq ? '&wa=' + waq : '') : '?r=' + rid);
+    const prem = data && data.info && data.info.premio;
+    const texto = DEMO ? 'Mira cómo funciona la rifa:' : 'Rifa de ' + NUM() + ' números' + (prem ? ' · Premio: ' + prem : '') + '. Elige tu número:';
     const title = data && data.info ? data.info.titulo : 'Rifa';
     try {
-      if (navigator.share) { await navigator.share({ title, text: 'Elige tu número en la rifa', url }); return; }
-      await navigator.clipboard.writeText(url);
+      if (navigator.share) { await navigator.share({ title, text: texto, url }); return; }
+      await navigator.clipboard.writeText(texto + '\n' + url);
       aviso('Enlace copiado.');
     } catch (e) {
       if (e && e.name === 'AbortError') return;
@@ -1045,8 +1146,9 @@
     const numeros = {}, cupos = {}, cartones = {};
     [3, 7, 12, 18, 22, 25, 31, 36, 40, 44, 47].forEach((n, i) => { numeros[n] = { nombre: nm[i % nm.length], pagado: i % 3 !== 1 }; });
     for (let n = 21; n <= 30; n++) { cupos[n] = true; cartones[n] = 'Ricardo'; }
+    const habil = {}; Object.keys(numeros).forEach((k) => { if (numeros[k].pagado) habil[k] = true; });
     fake.tree = {
-      rifas: { demo: { info: { titulo: 'Rifa de demostración', premio: 'Canasta navideña (demo)', precio: 5000, sello: await sha256(sec + ':demo'), org: 'demo-org', n: N, wa: normWa(new URLSearchParams(location.search).get('wa') || '') }, numeros, cartones } },
+      rifas: { demo: { info: { titulo: 'Rifa de demostración', premio: 'Canasta navideña (demo)', precio: 5000, sello: await sha256(sec + ':demo'), org: 'demo-org', n: N, wa: normWa(new URLSearchParams(location.search).get('wa') || '') }, numeros, cartones, habilitados: habil } },
       vendedores: { demo: { tokdemo: { nombre: 'Ricardo', cupos } } },
       paquetes: { demo: { p1: { nombre: 'Cartón 1', nums: cupos, vend: 'tokdemo' } } },
       contactos: { demo: { 3: '595981000111', 7: '595982000222' } },
@@ -1060,7 +1162,7 @@
     $('dmHint').textContent = DEMO === 'org' ? 'Estás viendo la rifa como organizador.' : 'Toca un número para reservarlo, como lo hace un comprador. Al final, abre el sobre para ver el resultado.';
     const abrirDemo = async () => {
       const up = {};
-      for (let n = 1; n <= N; n++) if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: nm[(n * 7) % nm.length], pagado: n % 2 === 0 };
+      for (let n = 1; n <= N; n++) { up['rifas/demo/habilitados/' + n] = true; if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: nm[(n * 7) % nm.length], pagado: true }; else up['rifas/demo/numeros/' + n + '/pagado'] = true; }
       up['rifas/demo/ganador'] = { numero: sec, sal: 'demo' };
       await update(ref(db), up);
     };
@@ -1074,7 +1176,7 @@
     $('soloReset').onclick = () => location.reload();
     $('dmFill').onclick = async () => {
       const up = {};
-      for (let n = 1; n <= N; n++) if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: nm[(n * 7) % nm.length], pagado: n % 2 === 0 };
+      for (let n = 1; n <= N; n++) { up['rifas/demo/habilitados/' + n] = true; if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: nm[(n * 7) % nm.length], pagado: true }; else up['rifas/demo/numeros/' + n + '/pagado'] = true; }
       await update(ref(db), up);
     };
   }
