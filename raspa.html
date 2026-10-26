@@ -3,7 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0F4C45">
+<meta name="theme-color" content="#0a1640">
+<link rel="manifest" href="manifest-raspa.webmanifest">
+<link rel="icon" type="image/png" href="icon-raspa-192.png">
+<link rel="apple-touch-icon" href="icon-raspa-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Raspa y Gana">
 <title>Raspa y Gana</title>
 <style>
   :root { --bg:#F6F3EC; --card:#fff; --tx:#1d1d1f; --mu:#6b6b70; --ac:#C8102E; --ok:#0a7d3c; --bd:#E3DED2; color-scheme: light; }
@@ -81,6 +86,8 @@
 
   <div id="msgBox" class="card hidden"></div>
 
+  <button class="sec full hidden" id="btnLast" type="button" style="margin-bottom:14px"></button>
+
   <!-- Acceso del organizador -->
   <section id="lock" class="card hidden">
     <h2>Acceso del organizador</h2>
@@ -94,7 +101,7 @@
 
   <!-- Crear juego -->
   <section id="create" class="card hidden">
-    <button class="sec full hidden" id="btnLast" style="margin-top:0"></button>
+    
     <h2>Crear juego</h2>
     <label>Nombre del juego</label><input id="cTitle" value="Raspa y Gana" maxlength="40">
     <label>Precio del boleto (₲)</label><input id="cPrice" type="number" min="1" value="5000">
@@ -208,7 +215,7 @@
       let ok = false;
       try { ok = (await get(ref(db, 'autorizados/' + uid))).exists(); } catch (e) {}
       $(ok ? 'create' : 'lock').classList.remove('hidden');
-      try { const u = JSON.parse(localStorage.getItem('raspa_ultimo') || 'null'); if (u) { $('btnLast').textContent = 'Volver a: ' + u.titulo; $('btnLast').classList.remove('hidden'); $('btnLast').onclick = () => { location.search = '?j=' + u.id; }; } } catch (e) {}
+      try { const u = JSON.parse(localStorage.getItem('raspa_ultimo') || 'null'); if (u) { $('btnLast').textContent = 'Volver a: ' + u.titulo; $('btnLast').classList.remove('hidden'); $('btnLast').onclick = () => { location.search = '?j=' + u.id + (u.c ? '&c=' + u.c : ''); }; } } catch (e) {}
       return;
     }
     onValue(ref(db, 'raspa/' + jid + '/info'), (s) => {
@@ -541,6 +548,7 @@
     $('create').classList.add('hidden'); $('admin').classList.add('hidden'); $('msgBox').classList.add('hidden'); $('play').classList.remove('hidden');
     if (init) return; init = true;
     $('ptitle').textContent = info.titulo;
+    try { localStorage.setItem('raspa_ultimo', JSON.stringify({ id: jid, c: cid, titulo: info.titulo })); } catch (e) {}
     if (info.wa) {
       $('buyCard').classList.remove('hidden');
       $('buyTxt').textContent = 'Escríbele al organizador por WhatsApp para comprar más jugadas' + (info.precio ? ' (' + fmt(info.precio) + ' cada una)' : '') + '. Cuando confirme tu pago, las agrega a este mismo boleto y las verás aquí.';

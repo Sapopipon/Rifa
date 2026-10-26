@@ -1,0 +1,33 @@
+{
+  "id": "./raspa.html",
+  "name": "Raspa y Gana",
+  "short_name": "Raspa y Gana",
+  "description": "Juega tus boletos de Raspa y Gana.",
+  "lang": "es",
+  "start_url": "./raspa.html",
+  "scope": "./raspa.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a1640",
+  "theme_color": "#0a1640",
+  "icons": [
+    {
+      "src": "icon-raspa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-raspa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-raspa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
