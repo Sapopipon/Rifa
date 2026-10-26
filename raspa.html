@@ -64,6 +64,11 @@
   .payBar .pay span { display:inline-flex; flex-direction:column; align-items:center; background:none; padding:2px 6px; font-size:12px; }
   .payBar .pay img { height:30px; }
   .payBar .pay b { color:#F2B134; margin-top:2px; }
+  #fx { position:fixed; inset:0; pointer-events:none; z-index:60; overflow:hidden; }
+  #fx i { position:absolute; font-style:normal; opacity:0; animation:destello 1.6s ease-out forwards; }
+  @keyframes destello { 0% { opacity:0; transform:scale(.2) rotate(0); } 30% { opacity:1; transform:scale(1.2) rotate(40deg); } 100% { opacity:0; transform:scale(.6) translateY(-30px) rotate(120deg); } }
+  .fxflash { position:absolute; inset:0; background:radial-gradient(circle, rgba(255,230,120,.6), transparent 70%); animation:flash .8s ease-out forwards; }
+  @keyframes flash { from { opacity:1; } to { opacity:0; } }
   .toast { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:#1d1d1f; color:#fff; padding:11px 16px; border-radius:12px; opacity:0; pointer-events:none; transition:opacity .25s; max-width:92vw; text-align:center; }
   .toast.show { opacity:1; }
 </style>
@@ -158,6 +163,7 @@
   </section>
 </main>
 <div class="toast" id="toast"></div>
+<div id="fx"></div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -397,9 +403,45 @@
       f.type = 'highpass'; f.frequency.value = 1800; src.buffer = b; src.connect(f); f.connect(ac.destination); src.start();
     } catch (e) {}
   }
-  function sonFin(gano) {
+  // Nivel del premio: 0 = el más chico ... 4 = el más grande
+  function nivel(m) { let n = 0; Object.values(info.premios || {}).forEach((a, i) => { if (m >= a) n = i; }); return Math.min(n, 4); }
+  const ESC = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568];
+  let ruido = null;
+  function aplauso(inicio, dur, dens, vol) {
+    const ac = audio();
+    if (!ruido) { ruido = ac.createBuffer(1, Math.floor(ac.sampleRate * .08), ac.sampleRate); const d = ruido.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3); }
+    for (let t = 0; t < dur; t += (1 / dens) * (.4 + Math.random() * 1.2)) {
+      const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+      src.buffer = ruido; src.playbackRate.value = .8 + Math.random() * .6;
+      f.type = 'bandpass'; f.frequency.value = 1200 + Math.random() * 2200; f.Q.value = .7;
+      g.gain.value = vol * (.4 + Math.random() * .6) * Math.min(1, (dur - t) / .6);
+      src.connect(f); f.connect(g); g.connect(ac.destination); src.start(ac.currentTime + inicio + t);
+    }
+  }
+  function sonFin(m) {
     if (mudo) return;
-    try { if (gano) [523, 659, 784, 1047, 1319].forEach((f, i) => nota(f, i * .12, .3, 'triangle', .18)); else { nota(330, 0, .25, 'sine', .12); nota(247, .22, .35, 'sine', .12); } } catch (e) {}
+    try {
+      if (m > 0) {
+        const nv = nivel(m), n = 3 + nv * 2;
+        for (let i = 0; i < n; i++) nota(ESC[Math.min(i, ESC.length - 1)], i * .1, .35, 'triangle', .17);
+        if (nv >= 2) [523, 659, 784].forEach((f) => nota(f * (nv >= 4 ? 2 : 1), n * .1, .9, 'triangle', .12));
+        aplauso(.3, 1.2 + nv * .9, 18 + nv * 10, .09 + nv * .02);
+      } else { nota(330, 0, .25, 'sine', .12); nota(247, .22, .35, 'sine', .12); }
+    } catch (e) {}
+  }
+  function destellos(nv) {
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const fx = $('fx'), icos = ['✨', '⭐', '✦', '🌟', '🎉'], n = 14 + nv * 14;
+    fx.innerHTML = '<div class="fxflash"></div>';
+    for (let i = 0; i < n; i++) {
+      const e = document.createElement('i');
+      e.textContent = icos[Math.floor(Math.random() * icos.length)];
+      e.style.left = Math.random() * 100 + '%'; e.style.top = Math.random() * 100 + '%';
+      e.style.fontSize = 14 + Math.random() * 22 + 'px';
+      e.style.animationDelay = Math.random() * .9 + 's'; e.style.animationDuration = 1.2 + Math.random() * 1.2 + 's';
+      fx.appendChild(e);
+    }
+    setTimeout(() => { fx.innerHTML = ''; }, 3600 + nv * 500);
   }
   $('btnMute').onclick = () => { mudo = !mudo; $('btnMute').textContent = mudo ? '🔇 Sonido apagado' : '🔊 Sonido'; };
 
@@ -442,7 +484,7 @@
     if (revealed || monto === null) return; revealed = true;
     ctx.clearRect(0, 0, cv.width, cv.height); cv.classList.add('hidden'); $('btnRev').classList.add('hidden');
     document.querySelectorAll('.fig.g').forEach((x) => x.classList.add('gana'));
-    resultado(monto, false); sonFin(monto > 0); if (!local) ui();
+    resultado(monto, false); sonFin(monto); if (monto > 0) destellos(nivel(monto)); if (!local) ui();
   }
   let celdas = null, marcadas = 0, CW = 0, CH = 0;
   function marcarZona(x, y) {
