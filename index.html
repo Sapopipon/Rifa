@@ -247,6 +247,7 @@
   .rev { flex-wrap: wrap; }
   .rev select { font: inherit; padding: 6px; border-radius: 8px; border: 2px solid var(--line); background: var(--page); color: var(--text); max-width: 100%; }
   .rev .btn { min-height: 36px; padding: 6px 12px; font-size: .85rem; }
+  body.solo #demoBar, body.solo .people, body.solo .footer-actions, body.solo #orgTag { display:none !important; }
   .toast {
     position: fixed; left: 50%; bottom: 18px;
     transform: translateX(-50%) translateY(20px);
@@ -329,6 +330,9 @@
     <p class="prize">¿Quieres mostrar cómo funciona? La demo es una rifa de ejemplo que se usa como la usa un comprador de números. No guarda nada, y cualquiera puede probarla.</p>
     <a class="btn ghost" href="?demo=1" style="text-align:center;text-decoration:none">Probar la demo (como comprador)</a>
     <p class="prize"><a href="?demo=org">Ver la demo como organizador</a></p>
+    <label>Enlace de la demo para publicar <small>Muestra solo el tablero, como lo ve un comprador.</small>
+      <input id="demoUrl" readonly onclick="this.select()">
+    </label>
     <button class="btn ghost" id="btnDemoLink" type="button">Compartir el enlace de la demo</button>
   </section>
 
@@ -442,6 +446,7 @@
 
   const $ = (id) => document.getElementById(id);
   const DEMO = new URLSearchParams(location.search).get('demo');
+  const SOLO = !!new URLSearchParams(location.search).get('solo');
   const rid = DEMO ? 'demo' : new URLSearchParams(location.search).get('r');
 
   // Modo demo: una base de datos simulada en memoria, no toca Firebase
@@ -985,7 +990,7 @@
 
   /* ---------- compartir y otras acciones ---------- */
   $('btnShare').addEventListener('click', async () => {
-    const url = location.origin + location.pathname + (DEMO ? '?demo=1' : '?r=' + rid);
+    const url = location.origin + location.pathname + (DEMO ? '?demo=1' + (SOLO ? '&solo=1' : '') : '?r=' + rid);
     const title = data && data.info ? data.info.titulo : 'Rifa';
     try {
       if (navigator.share) { await navigator.share({ title, text: 'Elige tu número en la rifa', url }); return; }
@@ -1012,6 +1017,7 @@
       privado: { demo: { secreto: sec, sal: 'demo' } }
     };
     $('demoBar').classList.remove('hidden');
+    if (SOLO) document.body.classList.add('solo');
     $('dmRole').textContent = DEMO === 'org' ? 'Ver como participante' : 'Ver como organizador';
     $('dmRole').onclick = () => { location.search = '?demo=' + (DEMO === 'org' ? '1' : 'org'); };
     $('dmReset').onclick = () => location.reload();
@@ -1028,8 +1034,9 @@
       await update(ref(db), up);
     };
   }
+  $('demoUrl').value = location.origin + location.pathname + '?demo=1&solo=1';
   $('btnDemoLink').onclick = async () => {
-    const url = location.origin + location.pathname + '?demo=1';
+    const url = location.origin + location.pathname + '?demo=1&solo=1';
     try { if (navigator.share) { await navigator.share({ url }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
     try { await navigator.clipboard.writeText(url); aviso('Enlace copiado.'); } catch (e) { prompt('Copia este enlace:', url); }
   };
