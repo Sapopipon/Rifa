@@ -247,7 +247,7 @@
   .rev { flex-wrap: wrap; }
   .rev select { font: inherit; padding: 6px; border-radius: 8px; border: 2px solid var(--line); background: var(--page); color: var(--text); max-width: 100%; }
   .rev .btn { min-height: 36px; padding: 6px 12px; font-size: .85rem; }
-  body.solo #demoBar, body.solo .people, body.solo .footer-actions, body.solo #orgTag { display:none !important; }
+  body.solo #demoBar, body.solo #revBox, body.solo #cartonBox, body.solo .footer-actions, body.solo #orgTag { display:none !important; }
   .toast {
     position: fixed; left: 50%; bottom: 18px;
     transform: translateX(-50%) translateY(20px);
@@ -325,10 +325,13 @@
     <label>Valor por número <small>Opcional, sirve para llevar la cuenta de lo recaudado.</small>
       <input type="number" id="inPrice" min="0" step="any" placeholder="Ej.: 5">
     </label>
+    <label>Tu WhatsApp de contacto <small>Opcional. Los compradores podrán escribirte desde la rifa y desde la demo.</small>
+      <input type="tel" id="inWa" inputmode="tel" maxlength="20" placeholder="Ej.: 0981 123 456">
+    </label>
     <button class="btn" id="btnStart">Sellar el sobre y crear la rifa</button>
     <hr style="border:0;border-top:1px solid var(--line);width:100%">
     <p class="prize">¿Quieres mostrar cómo funciona? La demo es una rifa de ejemplo que se usa como la usa un comprador de números. No guarda nada, y cualquiera puede probarla.</p>
-    <a class="btn ghost" href="?demo=1" style="text-align:center;text-decoration:none">Probar la demo (como comprador)</a>
+    <a class="btn ghost" id="demoTry" href="?demo=1" style="text-align:center;text-decoration:none">Probar la demo (como comprador)</a>
     <p class="prize"><a href="?demo=org">Ver la demo como organizador</a></p>
     <label>Enlace de la demo para publicar <small>Muestra solo el tablero, como lo ve un comprador.</small>
       <input id="demoUrl" readonly onclick="this.select()">
@@ -374,6 +377,13 @@
     </div>
 
     <div class="people hidden" id="revBox">
+      <h2>Tu contacto</h2>
+      <div class="setup" style="margin-bottom:14px">
+        <label>Tu WhatsApp para que los compradores te escriban
+          <input type="tel" id="ctWa" inputmode="tel" maxlength="20" placeholder="Ej.: 0981 123 456">
+        </label>
+        <button class="btn" id="ctSave" type="button">Guardar contacto</button>
+      </div>
       <h2>Cartones</h2>
       <div id="pqList"></div>
       <div class="setup" style="margin-top:8px">
@@ -395,6 +405,12 @@
       <h2>Participantes</h2>
       <div id="peopleList"></div>
     </div>
+
+    <section id="contactoCard" class="setup hidden" style="margin-top:18px">
+      <h2>¿Dudas o quieres más números?</h2>
+      <p class="prize">Escríbele directamente al organizador por WhatsApp.</p>
+      <button class="btn" id="btnContacto" type="button">Escribir por WhatsApp</button>
+    </section>
 
     <div class="footer-actions">
       <button class="btn ghost" id="btnNew">Crear otra rifa</button>
@@ -592,11 +608,14 @@
       const premio = $('inPrize').value.trim();
       const precio = parseFloat($('inPrice').value) || 0;
       const n = Math.min(500, Math.max(2, Math.round(+$('inN').value) || 100));
+      const waRaw = $('inWa').value.trim(), wa = normWa(waRaw);
+      if (waRaw && !wa) { btn.disabled = false; aviso('El WhatsApp no parece válido.'); return; }
       const secreto = randN(n);
       const sal = randHex(16);
       const sello = await sha256(secreto + ':' + sal);
       const id = randId(8);
       const info = { titulo, precio, sello, org: uid, n };
+      if (wa) { info.wa = wa; try { localStorage.setItem('rifa_wa_org', wa); } catch (e) {} }
       if (premio) info.premio = premio;
       await set(ref(db, 'rifas/' + id + '/info'), info);
       await set(ref(db, 'privado/' + id), { secreto, sal });
@@ -646,6 +665,9 @@
     $('orgTag').textContent = isOrg ? 'Eres el organizador de esta rifa.' : 'Cartón de ' + (miVend ? miVend.nombre : '');
     $('orgTag').classList.toggle('hidden', !isOrg && !miVend);
     $('btnNew').classList.toggle('hidden', !isOrg);
+    const verContacto = !!info.wa && !isOrg;
+    $('contactoCard').classList.toggle('hidden', !verContacto);
+    if (verContacto) $('btnContacto').onclick = () => window.open('https://wa.me/' + info.wa + '?text=' + encodeURIComponent('Hola, quiero consultar sobre la rifa "' + info.titulo + '".'), '_blank');
 
     $('cTaken').textContent = t;
     $('bar').style.width = (t * 100 / NUM()) + '%';
@@ -883,6 +905,13 @@
     catch (e) { aviso('No se pudo entregar el cartón.'); render(); }
   }
 
+  $('ctSave').onclick = async () => {
+    const raw = $('ctWa').value.trim(), wa = normWa(raw);
+    if (raw && !wa) { aviso('El WhatsApp no parece válido.'); return; }
+    try { await update(ref(db), { ['rifas/' + rid + '/info/wa']: wa || null }); aviso(wa ? 'Contacto guardado.' : 'Contacto quitado.'); }
+    catch (e) { aviso('No se pudo guardar el contacto.'); }
+  };
+
   async function borrarPaquete(pid) {
     const q = paquetes[pid];
     if (!confirm('¿Eliminar "' + q.nombre + '"? Sus números sin vender quedarán libres.')) return;
@@ -928,6 +957,7 @@
 
   function renderRev(numeros, info, isOrg) {
     $('revBox').classList.toggle('hidden', !isOrg);
+    if (isOrg && !$('ctWa').dataset.listo) { $('ctWa').dataset.listo = '1'; $('ctWa').value = info.wa || ''; }
     $('cartonBox').classList.toggle('hidden', !miVend);
     if (isOrg) {
       const pl = $('pqList');
@@ -1016,7 +1046,7 @@
     [3, 7, 12, 18, 22, 25, 31, 36, 40, 44, 47].forEach((n, i) => { numeros[n] = { nombre: nm[i % nm.length], pagado: i % 3 !== 1 }; });
     for (let n = 21; n <= 30; n++) { cupos[n] = true; cartones[n] = 'Ricardo'; }
     fake.tree = {
-      rifas: { demo: { info: { titulo: 'Rifa de demostración', premio: 'Canasta navideña (demo)', precio: 5000, sello: await sha256(sec + ':demo'), org: 'demo-org', n: N }, numeros, cartones } },
+      rifas: { demo: { info: { titulo: 'Rifa de demostración', premio: 'Canasta navideña (demo)', precio: 5000, sello: await sha256(sec + ':demo'), org: 'demo-org', n: N, wa: normWa(new URLSearchParams(location.search).get('wa') || '') }, numeros, cartones } },
       vendedores: { demo: { tokdemo: { nombre: 'Ricardo', cupos } } },
       paquetes: { demo: { p1: { nombre: 'Cartón 1', nums: cupos, vend: 'tokdemo' } } },
       contactos: { demo: { 3: '595981000111', 7: '595982000222' } },
@@ -1030,7 +1060,7 @@
     $('dmHint').textContent = DEMO === 'org' ? 'Estás viendo la rifa como organizador.' : 'Toca un número para reservarlo, como lo hace un comprador. Al final, abre el sobre para ver el resultado.';
     const abrirDemo = async () => {
       const up = {};
-      for (let n = 1; n <= N; n++) if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: 'Invitado ' + n, pagado: n % 2 === 0 };
+      for (let n = 1; n <= N; n++) if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: nm[(n * 7) % nm.length], pagado: n % 2 === 0 };
       up['rifas/demo/ganador'] = { numero: sec, sal: 'demo' };
       await update(ref(db), up);
     };
@@ -1044,13 +1074,19 @@
     $('soloReset').onclick = () => location.reload();
     $('dmFill').onclick = async () => {
       const up = {};
-      for (let n = 1; n <= N; n++) if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: 'Invitado ' + n, pagado: n % 2 === 0 };
+      for (let n = 1; n <= N; n++) if (!gp('rifas/demo/numeros/' + n)) up['rifas/demo/numeros/' + n] = { nombre: nm[(n * 7) % nm.length], pagado: n % 2 === 0 };
       await update(ref(db), up);
     };
   }
-  $('demoUrl').value = location.origin + location.pathname + '?demo=1&solo=1';
+  const actualizarDemo = () => {
+    const wa = normWa($('inWa').value);
+    $('demoUrl').value = location.origin + location.pathname + '?demo=1&solo=1' + (wa ? '&wa=' + wa : '');
+    $('demoTry').href = '?demo=1' + (wa ? '&wa=' + wa : '');
+  };
+  try { $('inWa').value = localStorage.getItem('rifa_wa_org') || ''; } catch (e) {}
+  $('inWa').addEventListener('input', actualizarDemo); actualizarDemo();
   $('btnDemoLink').onclick = async () => {
-    const url = location.origin + location.pathname + '?demo=1&solo=1';
+    const url = $('demoUrl').value;
     try { if (navigator.share) { await navigator.share({ url }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
     try { await navigator.clipboard.writeText(url); aviso('Enlace copiado.'); } catch (e) { prompt('Copia este enlace:', url); }
   };
